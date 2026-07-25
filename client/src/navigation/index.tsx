@@ -2,6 +2,7 @@
 // context selector, not a navigation axis. Alerts tab badges unacknowledged
 // count; Control shows a dot while a shell session runs.
 import React, { useEffect } from 'react';
+import * as Linking from 'expo-linking';
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -34,6 +35,10 @@ import { RuleEditor } from '../screens/alerts/RuleEditor';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
 import { DevicesKeys } from '../screens/settings/DevicesKeys';
 import { Diagnostics } from '../screens/settings/Diagnostics';
+import { SecuritySettings } from '../screens/settings/SecuritySettings';
+import { AppearanceSettings } from '../screens/settings/AppearanceSettings';
+import { DataSettings } from '../screens/settings/DataSettings';
+import { SecurityLog } from '../screens/settings/SecurityLog';
 import { SERIES } from '../sim/metrics';
 
 const Stack = createNativeStackNavigator();
@@ -105,6 +110,10 @@ function SettingsStack() {
     <Stack.Navigator screenOptions={opts}>
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="DevicesKeys" component={DevicesKeys} options={{ title: 'Devices & keys' }} />
+      <Stack.Screen name="SecuritySettings" component={SecuritySettings} options={{ title: 'Security' }} />
+      <Stack.Screen name="AppearanceSettings" component={AppearanceSettings} options={{ title: 'Appearance' }} />
+      <Stack.Screen name="DataSettings" component={DataSettings} options={{ title: 'Data & retention' }} />
+      <Stack.Screen name="SecurityLog" component={SecurityLog} options={{ title: 'Security log' }} />
       <Stack.Screen name="Diagnostics" component={Diagnostics} />
       <Stack.Screen name="AgentList" component={AgentList} options={{ title: 'Pis' }} />
       <Stack.Screen name="AgentDetail" component={AgentDetail} options={{ title: 'About this Pi' }} />
@@ -206,9 +215,85 @@ function OnboardingStack() {
   );
 }
 
+// Deep links (§1.4): pimon:// scheme; in Expo Go the same paths work as
+// exp://<host>/--/<path>. Every link resolves against locally held state only.
+const linking: any = {
+  prefixes: [Linking.createURL('/'), 'pimon://'],
+  config: {
+    screens: {
+      DashboardTab: {
+        screens: {
+          Dashboard: 'dashboard',
+          MetricDetail: 'metric/:seriesKey',
+          AgentList: 'agents',
+          AgentDetail: 'agent/:agentId',
+          Diagnostics: 'diagnostics',
+        },
+      },
+      ControlTab: {
+        screens: {
+          ControlHub: 'control',
+          Shell: 'shell',
+          Desktop: 'desktop',
+          Actions: 'actions',
+        },
+      },
+      AlertsTab: {
+        screens: {
+          Alerts: 'alerts',
+          AlertDetail: 'alert/:alertId',
+          Rules: 'rules',
+          RuleEditor: 'rule',
+        },
+      },
+      SettingsTab: {
+        screens: {
+          Settings: 'settings',
+          DevicesKeys: 'settings/devices',
+          SecuritySettings: 'settings/security',
+          AppearanceSettings: 'settings/appearance',
+          DataSettings: 'settings/data',
+          SecurityLog: 'settings/log',
+          Diagnostics: 'settings/diagnostics',
+        },
+      },
+    },
+  },
+};
+
+/** Dev/testing hook: `…/--/demo/pair` pairs a demo Pi without the camera. */
+function useDemoPairLink() {
+  const url = Linking.useURL();
+  useEffect(() => {
+    if (!url) return;
+    const { path } = Linking.parse(url);
+    if (path === 'demo/pair' && !useStore.getState().paired) {
+      const now = Date.now();
+      const { DEFAULT_RULES, DEFAULT_ACTIONS } = require('../sim/seed');
+      const { wordsFromHex, randomHex } = require('../lib/fingerprint');
+      const hex = randomHex(32);
+      useStore.getState().set({ rules: DEFAULT_RULES, actions: DEFAULT_ACTIONS });
+      useStore.getState().pairAgent({
+        id: `agent-${now}`,
+        name: 'pi5-livingroom',
+        hostname: 'pi5-livingroom',
+        model: 'Raspberry Pi 5 · 8 GB',
+        os: 'Raspberry Pi OS Trixie (64-bit)',
+        agentVersion: '1.0.0',
+        fingerprintHex: hex,
+        fingerprintWords: wordsFromHex(hex),
+        pairedAt: now,
+        verifiedAt: now,
+      });
+      startTunnel();
+    }
+  }, [url]);
+}
+
 export function RootNavigation() {
   const { c, isDark } = useTheme();
   const paired = useStore((s) => s.paired);
+  useDemoPairLink();
 
   const navTheme = {
     ...(isDark ? DarkTheme : DefaultTheme),
@@ -223,7 +308,7 @@ export function RootNavigation() {
   };
 
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer theme={navTheme} linking={paired ? linking : undefined}>
       {paired ? <MainTabs /> : <OnboardingStack />}
     </NavigationContainer>
   );

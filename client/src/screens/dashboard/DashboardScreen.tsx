@@ -1,6 +1,6 @@
 // Dashboard (§7) — the hero screen. Vertical order is deliberate:
 // connection → the four numbers that matter → what I can do → what is wrong → why.
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../theme';
 import { useStore } from '../../store/useStore';
 import { ConnectionBanner } from '../../components/ConnectionBanner';
+import { AgentSwitcher } from '../../components/AgentSwitcher';
 import { TimeRangeChips } from '../../components/TimeRangeChips';
 import { StatTile } from '../../components/StatTile';
 import { MetricChart } from '../../components/MetricChart';
@@ -39,6 +40,7 @@ export function DashboardScreen() {
   const alerts = useStore((s) => s.alerts);
   const setStore = useStore((s) => s.set);
   const firstRunCardDismissed = useStore((s) => s.firstRunCardDismissed);
+  const [showSwitcher, setShowSwitcher] = useState(false);
   // The one-time note (§20): only within the first hour after pairing.
   const showFirstRun = !firstRunCardDismissed && agent != null && Date.now() - agent.pairedAt < 3_600_000;
 
@@ -69,7 +71,7 @@ export function DashboardScreen() {
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}>
         <TouchableOpacity
           style={{ flexDirection: 'row', alignItems: 'center' }}
-          onPress={() => nav.navigate('AgentList')}
+          onPress={() => setShowSwitcher(true)}
           accessibilityRole="button"
         >
           <Text style={[type.title2, { color: c.text.primary }]}>{agent?.name ?? 'Dashboard'}</Text>
@@ -249,6 +251,12 @@ export function DashboardScreen() {
           />
         </View>
       </ScrollView>
+
+      <AgentSwitcher
+        visible={showSwitcher}
+        onClose={() => setShowSwitcher(false)}
+        onSeeAll={() => nav.navigate('AgentList')}
+      />
     </View>
   );
 }

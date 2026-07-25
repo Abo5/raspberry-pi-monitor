@@ -22,7 +22,9 @@ export function MetricDetail() {
   const meta = SERIES[seriesKey];
 
   const snapshot = useStore((s) => s.snapshot);
-  const rules = useStore((s) => s.rules.filter((r) => r.seriesKey === seriesKey));
+  // Selector must return a stable reference (zustand v5); filter afterwards.
+  const allRules = useStore((s) => s.rules);
+  const rules = useMemo(() => allRules.filter((r) => r.seriesKey === seriesKey), [allRules, seriesKey]);
   const [range, setRange] = useState<TimeRange>('6h');
 
   const tick = RANGE_MS[range] <= RANGE_MS['1h'] ? snapshot?.receivedAt : 0;
