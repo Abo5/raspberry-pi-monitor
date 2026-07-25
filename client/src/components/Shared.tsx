@@ -10,7 +10,7 @@ export function Screen({ children, scroll = true, style }: { children: React.Rea
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: c.surface.canvas }}
-      contentContainerStyle={[{ padding: 16, paddingBottom: 32 }, style]}
+      contentContainerStyle={[{ padding: 16, paddingBottom: 120 }, style]}
     >
       {children}
     </ScrollView>
@@ -57,11 +57,13 @@ interface RowProps {
   disabled?: boolean;
   onPress?: () => void;
   icon?: keyof typeof Ionicons.glyphMap;
+  /** Windows-App-style colored icon square behind the glyph */
+  iconBg?: string;
   right?: React.ReactNode;
   last?: boolean;
 }
 
-export function ListRow({ title, subtitle, value, mono, chevron, destructive, disabled, onPress, icon, right, last }: RowProps) {
+export function ListRow({ title, subtitle, value, mono, chevron, destructive, disabled, onPress, icon, iconBg, right, last }: RowProps) {
   const { c, type } = useTheme();
   const ink = disabled ? c.text.disabled : destructive ? c.status.critical : c.text.primary;
   return (
@@ -80,7 +82,24 @@ export function ListRow({ title, subtitle, value, mono, chevron, destructive, di
         borderBottomColor: c.border.hairline,
       })}
     >
-      {icon && <Ionicons name={icon} size={18} color={destructive ? c.status.critical : c.text.secondary} style={{ marginRight: 12 }} />}
+      {icon &&
+        (iconBg ? (
+          <View
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              backgroundColor: iconBg,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: 12,
+            }}
+          >
+            <Ionicons name={icon} size={17} color="#FFFFFF" />
+          </View>
+        ) : (
+          <Ionicons name={icon} size={18} color={destructive ? c.status.critical : c.text.secondary} style={{ marginRight: 12 }} />
+        ))}
       <View style={{ flex: 1 }}>
         <Text style={[type.body, { color: ink }]}>{title}</Text>
         {subtitle ? (

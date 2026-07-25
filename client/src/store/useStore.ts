@@ -49,6 +49,9 @@ interface State {
 
   firstRunCardDismissed: boolean;
 
+  /** Widget designs the user picked in the gallery (design ids). */
+  selectedWidgets: string[];
+
   settings: Settings;
 
   // mutations
@@ -62,6 +65,7 @@ interface State {
   upsertRule: (rule: AlertRule) => void;
   deleteRule: (id: string) => void;
   appendShell: (lines: string[]) => void;
+  toggleWidget: (id: string) => void;
 }
 
 export const useStore = create<State>((set, get) => ({
@@ -89,6 +93,8 @@ export const useStore = create<State>((set, get) => ({
   shellSessionStartedAt: null,
 
   firstRunCardDismissed: false,
+
+  selectedWidgets: [],
 
   settings: {
     theme: 'system',
@@ -156,4 +162,9 @@ export const useStore = create<State>((set, get) => ({
   deleteRule: (id) => set({ rules: get().rules.filter((r) => r.id !== id) }),
 
   appendShell: (lines) => set({ shellBuffer: [...get().shellBuffer, ...lines].slice(-10_000) }),
+
+  toggleWidget: (id) => {
+    const cur = get().selectedWidgets;
+    set({ selectedWidgets: cur.includes(id) ? cur.filter((w) => w !== id) : [...cur, id] });
+  },
 }));

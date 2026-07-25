@@ -86,7 +86,7 @@ export function DashboardScreen() {
       <ConnectionBanner onPress={() => nav.navigate('Diagnostics')} />
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 130 }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={() => {}} tintColor={c.text.tertiary} />}
       >
         <TimeRangeChips value={range} onChange={(r: TimeRange) => setStore({ dashboardRange: r })} />

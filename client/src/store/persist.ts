@@ -16,6 +16,7 @@ const FIELDS = [
   'actions',
   'settings',
   'firstRunCardDismissed',
+  'selectedWidgets',
 ] as const;
 
 export async function hydrate(): Promise<void> {

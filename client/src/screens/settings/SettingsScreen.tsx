@@ -38,15 +38,16 @@ export function SettingsScreen() {
 
       <Eyebrow>CONFIGURE</Eyebrow>
       <Card>
-        <ListRow title="Security" icon="lock-closed-outline" chevron onPress={() => nav.navigate('SecuritySettings')} />
-        <ListRow title="Appearance" icon="contrast-outline" value={settings.theme} chevron onPress={() => nav.navigate('AppearanceSettings')} />
-        <ListRow title="Data & retention" icon="server-outline" chevron onPress={() => nav.navigate('DataSettings')} last />
+        <ListRow title="Security" icon="lock-closed" iconBg="#5B5BD6" chevron onPress={() => nav.navigate('SecuritySettings')} />
+        <ListRow title="Appearance" icon="contrast" iconBg="#0B84CE" value={settings.theme} chevron onPress={() => nav.navigate('AppearanceSettings')} />
+        <ListRow title="Data & retention" icon="server" iconBg="#8E5B2F" chevron onPress={() => nav.navigate('DataSettings')} />
+        <ListRow title="Widgets" icon="grid" iconBg="#7C3AED" chevron onPress={() => nav.navigate('WidgetsTab' as never)} last />
       </Card>
 
-      <Eyebrow>DIAGNOSTICS</Eyebrow>
+      <Eyebrow>SUPPORT AND DIAGNOSTICS</Eyebrow>
       <Card>
-        <ListRow title="Connection inspector" icon="pulse-outline" chevron onPress={() => nav.navigate('Diagnostics')} />
-        <ListRow title="Security log" icon="document-text-outline" chevron onPress={() => nav.navigate('SecurityLog')} last />
+        <ListRow title="Connection inspector" icon="pulse" iconBg="#0F7A5B" chevron onPress={() => nav.navigate('Diagnostics')} />
+        <ListRow title="Security log" icon="document-text" iconBg="#946200" chevron onPress={() => nav.navigate('SecurityLog')} last />
       </Card>
 
       <Eyebrow>ABOUT</Eyebrow>

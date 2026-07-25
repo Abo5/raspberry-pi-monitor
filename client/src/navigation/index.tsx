@@ -3,14 +3,18 @@
 // count; Control shows a dot while a shell session runs.
 import React, { useEffect } from 'react';
 import * as Linking from 'expo-linking';
-import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer, getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme';
 import { useStore } from '../store/useStore';
 import { startTunnel } from '../sim/tunnel';
+import { DevicesHome } from '../screens/devices/DevicesHome';
+import { ConnectScreen } from '../screens/devices/ConnectScreen';
+import { WidgetGallery } from '../screens/widgets/WidgetGallery';
 
 import { Welcome } from '../screens/onboarding/Welcome';
 import { Install } from '../screens/onboarding/Install';
@@ -53,6 +57,32 @@ function useStackOptions() {
     headerShadowVisible: false,
     contentStyle: { backgroundColor: c.surface.canvas },
   } as const;
+}
+
+function DevicesStack() {
+  const opts = useStackOptions();
+  return (
+    <Stack.Navigator screenOptions={opts}>
+      <Stack.Screen name="DevicesHome" component={DevicesHome} options={{ headerShown: false }} />
+      <Stack.Screen name="Connect" component={ConnectScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="AgentList" component={AgentList} options={{ title: 'Pis' }} />
+      <Stack.Screen name="AgentDetail" component={AgentDetail} options={{ title: 'About this Pi' }} />
+      <Stack.Screen name="Diagnostics" component={Diagnostics} />
+      <Stack.Screen name="ScanQR" component={ScanQR} options={{ title: 'Pair' }} />
+      <Stack.Screen name="Verify" component={Verify} options={{ title: 'Verify', headerBackVisible: false }} />
+      <Stack.Screen name="NamePi" component={NamePi} options={{ title: 'Name', headerBackVisible: false }} />
+      <Stack.Screen name="Permissions" component={Permissions} options={{ title: 'Almost done', headerBackVisible: false }} />
+    </Stack.Navigator>
+  );
+}
+
+function WidgetsStack() {
+  const opts = useStackOptions();
+  return (
+    <Stack.Navigator screenOptions={opts}>
+      <Stack.Screen name="WidgetGallery" component={WidgetGallery} options={{ headerShown: false }} />
+    </Stack.Navigator>
+  );
 }
 
 function DashboardStack() {
@@ -125,13 +155,123 @@ function SettingsStack() {
   );
 }
 
-function MainTabs() {
-  const { c } = useTheme();
-  const alerts = useStore((s) => s.alerts);
-  const shellOpen = useStore((s) => s.shellSessionStartedAt != null);
-  const unacked = alerts.filter((a) => a.resolvedAt == null && a.acknowledgedAt == null);
-  const anyCritical = unacked.some((a) => a.severity === 'critical');
+// Floating pill tab bar in the Windows App style: a dark capsule bottom-left,
+// active tab highlighted; Alerts and Settings are reachable from the Devices
+// home's circular buttons, not the bar.
+const PILL_TABS: { name: string; icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
+  { name: 'DevicesTab', icon: 'desktop-outline', label: 'Devices' },
+  { name: 'MonitorTab', icon: 'speedometer-outline', label: 'Monitor' },
+  { name: 'ControlTab', icon: 'flash-outline', label: 'Control' },
+  { name: 'WidgetsTab', icon: 'grid-outline', label: 'Widgets' },
+];
 
+const TAB_ROOTS: Record<string, string> = {
+  DevicesTab: 'DevicesHome',
+  MonitorTab: 'Dashboard',
+  ControlTab: 'ControlHub',
+  WidgetsTab: 'WidgetGallery',
+  AlertsTab: 'Alerts',
+  SettingsTab: 'Settings',
+};
+
+function PillTabBar({ state, navigation }: any) {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  const shellOpen = useStore((s) => s.shellSessionStartedAt != null);
+  const activeRoute = state.routes[state.index];
+  const activeName = activeRoute?.name;
+
+  // Like the reference app, the bar lives on the top-level surfaces only —
+  // pushed screens (Shell, Actions, Metric detail…) get the full height.
+  const focusedScreen = getFocusedRouteNameFromRoute(activeRoute) ?? TAB_ROOTS[activeName];
+  if (focusedScreen !== TAB_ROOTS[activeName]) return null;
+
+  return (
+    <View
+      pointerEvents="box-none"
+      style={{
+        position: 'absolute',
+        left: 16,
+        right: 16,
+        bottom: Math.max(insets.bottom, 12),
+        flexDirection: 'row',
+        alignItems: 'center',
+      }}
+    >
+      <View
+        style={{
+          flexDirection: 'row',
+          backgroundColor: 'rgba(28,28,31,0.96)',
+          borderRadius: 34,
+          padding: 6,
+          gap: 2,
+        }}
+      >
+        {PILL_TABS.map((tab) => {
+          const active = activeName === tab.name;
+          return (
+            <Pressable
+              key={tab.name}
+              onPress={() => navigation.navigate(tab.name)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: active ? 16 : 13,
+                height: 52,
+                borderRadius: 28,
+                backgroundColor: active ? '#2E2E34' : 'transparent',
+              }}
+            >
+              <View>
+                <Ionicons name={tab.icon} size={21} color={active ? c.accent.base : '#9A9AA0'} />
+                {tab.name === 'ControlTab' && shellOpen && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      right: -3,
+                      top: -2,
+                      width: 7,
+                      height: 7,
+                      borderRadius: 4,
+                      backgroundColor: c.accent.base,
+                    }}
+                  />
+                )}
+              </View>
+              {active && (
+                <Text style={{ color: c.accent.base, fontSize: 13, fontWeight: '600', marginLeft: 7 }}>
+                  {tab.label}
+                </Text>
+              )}
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={{ flex: 1 }} />
+
+      <Pressable
+        onPress={() => navigation.navigate('SettingsTab')}
+        accessibilityRole="button"
+        accessibilityLabel="Settings"
+        style={({ pressed }) => ({
+          width: 58,
+          height: 58,
+          borderRadius: 29,
+          backgroundColor: pressed ? '#2A2A2E' : 'rgba(28,28,31,0.96)',
+          alignItems: 'center',
+          justifyContent: 'center',
+        })}
+      >
+        <Ionicons name="settings-outline" size={22} color="#EDEDF0" />
+      </Pressable>
+    </View>
+  );
+}
+
+function MainTabs() {
   useEffect(() => {
     // Re-establish the tunnel if the app reloaded while paired.
     if (useStore.getState().connection.kind === 'unknown') startTunnel();
@@ -139,64 +279,15 @@ function MainTabs() {
 
   return (
     <Tabs.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: c.accent.base,
-        tabBarInactiveTintColor: c.text.tertiary,
-        tabBarStyle: { backgroundColor: c.surface.canvas, borderTopColor: c.border.hairline },
-      }}
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => <PillTabBar {...props} />}
     >
-      <Tabs.Screen
-        name="DashboardTab"
-        component={DashboardStack}
-        options={{
-          title: 'Dashboard',
-          tabBarIcon: ({ color, size }) => <Ionicons name="speedometer-outline" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="ControlTab"
-        component={ControlStack}
-        options={{
-          title: 'Control',
-          tabBarIcon: ({ color, size }) => (
-            <View>
-              <Ionicons name="flash-outline" size={size} color={color} />
-              {shellOpen && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    right: -2,
-                    top: -1,
-                    width: 7,
-                    height: 7,
-                    borderRadius: 4,
-                    backgroundColor: c.accent.base,
-                  }}
-                />
-              )}
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="AlertsTab"
-        component={AlertsStack}
-        options={{
-          title: 'Alerts',
-          tabBarIcon: ({ color, size }) => <Ionicons name="notifications-outline" size={size} color={color} />,
-          tabBarBadge: unacked.length > 0 ? unacked.length : undefined,
-          tabBarBadgeStyle: { backgroundColor: anyCritical ? c.status.critical : c.status.warning, color: '#fff' },
-        }}
-      />
-      <Tabs.Screen
-        name="SettingsTab"
-        component={SettingsStack}
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color, size }) => <Ionicons name="settings-outline" size={size} color={color} />,
-        }}
-      />
+      <Tabs.Screen name="DevicesTab" component={DevicesStack} />
+      <Tabs.Screen name="MonitorTab" component={DashboardStack} />
+      <Tabs.Screen name="ControlTab" component={ControlStack} />
+      <Tabs.Screen name="WidgetsTab" component={WidgetsStack} />
+      <Tabs.Screen name="AlertsTab" component={AlertsStack} />
+      <Tabs.Screen name="SettingsTab" component={SettingsStack} />
     </Tabs.Navigator>
   );
 }
@@ -221,12 +312,23 @@ const linking: any = {
   prefixes: [Linking.createURL('/'), 'pimon://'],
   config: {
     screens: {
-      DashboardTab: {
+      DevicesTab: {
+        screens: {
+          DevicesHome: 'home',
+          Connect: 'connect/:agentId',
+          AgentList: 'agents',
+          AgentDetail: 'agent/:agentId',
+        },
+      },
+      WidgetsTab: {
+        screens: {
+          WidgetGallery: 'widgets',
+        },
+      },
+      MonitorTab: {
         screens: {
           Dashboard: 'dashboard',
           MetricDetail: 'metric/:seriesKey',
-          AgentList: 'agents',
-          AgentDetail: 'agent/:agentId',
           Diagnostics: 'diagnostics',
         },
       },

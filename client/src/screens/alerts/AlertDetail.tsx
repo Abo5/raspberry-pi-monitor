@@ -109,7 +109,7 @@ export function AlertDetail() {
       <ActionButton
         label="See the data ›"
         variant="tertiary"
-        onPress={() => nav.navigate('DashboardTab', { screen: 'MetricDetail', params: { seriesKey: alert.seriesKey } })}
+        onPress={() => nav.navigate('MonitorTab', { screen: 'MetricDetail', params: { seriesKey: alert.seriesKey } })}
         style={{ marginTop: 8 }}
       />
       {rule && (
