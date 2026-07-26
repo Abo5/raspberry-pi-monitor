@@ -11,7 +11,7 @@ import { type as t, mono } from '../../theme/typography';
 import { useStore } from '../../store/useStore';
 import { dark } from '../../theme/colors';
 import { metricValue } from '../../sim/metrics';
-import { fmtDuration, fmtPct, fmtTemp } from '../../lib/format';
+import { fmtTemp } from '../../lib/format';
 
 const PROMPT = 'pi@pi5-livingroom:~ $';
 

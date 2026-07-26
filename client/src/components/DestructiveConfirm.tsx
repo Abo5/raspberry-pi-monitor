@@ -24,7 +24,6 @@ const KNOB = 42;
 export function DestructiveConfirm({ visible, title, consequence, facts, slideLabel, onConfirm, onCancel }: Props) {
   const { c, type, radius, motion } = useTheme();
   const [armed, setArmed] = useState(false);
-  const [trackW, setTrackW] = useState(0);
   const dragX = useRef(new Animated.Value(0)).current;
   const armedRef = useRef(false);
   const trackWRef = useRef(0);
@@ -102,7 +101,6 @@ export function DestructiveConfirm({ visible, title, consequence, facts, slideLa
 
           <View
             onLayout={(e) => {
-              setTrackW(e.nativeEvent.layout.width);
               trackWRef.current = e.nativeEvent.layout.width;
             }}
             style={{

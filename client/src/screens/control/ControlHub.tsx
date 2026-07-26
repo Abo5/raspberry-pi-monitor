@@ -4,7 +4,6 @@ import React from 'react';
 import { Text, View } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../theme';
 import { useStore } from '../../store/useStore';
 import { Screen, Card, ListRow } from '../../components/Shared';

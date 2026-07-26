@@ -17,7 +17,7 @@ import { Sparkline } from '../../components/Sparkline';
 import { Skeleton } from '../../components/States';
 import { RANGE_MS, SeriesKey, TimeRange } from '../../types';
 import { rollupNote, sampleSeries } from '../../sim/metrics';
-import { fmtBps, fmtPct, fmtTemp, fmtValue } from '../../lib/format';
+import { fmtBps, fmtPct, fmtTemp } from '../../lib/format';
 
 const QUICK: { icon: keyof typeof Ionicons.glyphMap; label: string; target: string }[] = [
   { icon: 'desktop-outline', label: 'Desktop', target: 'Desktop' },

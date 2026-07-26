@@ -13,7 +13,6 @@ interface Props {
   unit?: string;
   samples?: Sample[];
   width: number;
-  wide?: boolean;
   gauge?: number; // render a GaugeRing instead of value+sparkline
   thermalColor?: string;
   dimmed?: boolean;
@@ -26,7 +25,7 @@ interface Props {
 export function StatTile(props: Props) {
   const { c, type, radius } = useTheme();
   const {
-    eyebrow, value, unit, samples, width, wide, gauge, thermalColor, dimmed, ageStamp, onPress,
+    eyebrow, value, unit, samples, width, gauge, thermalColor, dimmed, ageStamp, onPress,
     secondary, sparkColor,
   } = props;
 

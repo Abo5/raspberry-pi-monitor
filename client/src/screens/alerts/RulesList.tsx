@@ -1,6 +1,6 @@
 // Alert Rules (§13.3): grouped by Series, enable toggles.
 import React from 'react';
-import { Switch, Text, View } from 'react-native';
+import { Switch, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../theme';
 import { useStore } from '../../store/useStore';

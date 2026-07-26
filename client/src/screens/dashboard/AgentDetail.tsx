@@ -2,7 +2,7 @@
 // not change minute to minute. Rows that reach the Agent show an offline chip
 // instead of a value when the Tunnel is down, never a spinner.
 import React, { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Text } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '../../theme';
 import { useStore } from '../../store/useStore';
