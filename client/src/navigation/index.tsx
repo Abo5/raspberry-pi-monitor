@@ -225,7 +225,7 @@ function PillTabBar({ state, navigation }: any) {
               }}
             >
               <View>
-                <Ionicons name={tab.icon} size={21} color={active ? c.accent.base : '#9A9AA0'} />
+                <Ionicons name={tab.icon} size={21} color={active ? c.accent.base : '#B4B4BA'} />
                 {tab.name === 'ControlTab' && shellOpen && (
                   <View
                     style={{

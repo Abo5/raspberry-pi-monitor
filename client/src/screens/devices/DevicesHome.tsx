@@ -69,7 +69,7 @@ export function DevicesHome() {
 
   const unacked = alerts.filter((a) => a.resolvedAt == null && a.acknowledgedAt == null).length;
   const cardW = width - 32;
-  const cardH = 220;
+  const cardH = 236;
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000000', paddingTop: insets.top }}>
@@ -117,7 +117,12 @@ export function DevicesHome() {
                     transform: [{ scale: pressed ? 0.985 : 1 }],
                   })}
                 >
-                  <WaveBackground width={cardW} height={cardH * 0.72} variant={VARIANTS[i % VARIANTS.length]} />
+                  <WaveBackground
+                    width={cardW}
+                    height={cardH}
+                    variant={VARIANTS[i % VARIANTS.length]}
+                    bottomScrim={cardH * 0.5}
+                  />
 
                   {/* chip + status */}
                   <View style={{ flexDirection: 'row', padding: 14 }}>
@@ -144,23 +149,21 @@ export function DevicesHome() {
                     )}
                   </View>
 
-                  {/* bottom strip */}
+                  {/* bottom label — sits over the wave's fade, no hard seam */}
                   <View
                     style={{
                       position: 'absolute',
                       left: 0,
                       right: 0,
                       bottom: 0,
-                      height: cardH * 0.3,
-                      backgroundColor: 'rgba(12,12,15,0.86)',
                       paddingHorizontal: 18,
-                      justifyContent: 'center',
+                      paddingBottom: 18,
                     }}
                   >
                     <Text style={[type.title2, { color: '#FFFFFF' }]} numberOfLines={1}>
                       {agent.name}
                     </Text>
-                    <Text style={[type.subhead, { color: '#9A9AA0', marginTop: 2 }]} numberOfLines={1}>
+                    <Text style={[type.subhead, { color: '#C9C9CE', marginTop: 3 }]} numberOfLines={1}>
                       {agent.hostname}.local
                       {v
                         ? `   ·   ${fmtTemp(v['cpu.temp_c'] ?? 0)}°C · CPU ${fmtPct(v['cpu.util_pct'] ?? 0)}%`

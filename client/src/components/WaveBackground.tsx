@@ -9,6 +9,8 @@ interface Props {
   /** hue variant so multiple cards don't look identical */
   variant?: 'magenta' | 'cyan' | 'violet' | 'ember';
   dim?: boolean; // darker version for full-screen backdrops
+  /** fade the bottom N px to near-black so overlaid text stays legible (no seam) */
+  bottomScrim?: number;
 }
 
 const PALETTES = {
@@ -18,9 +20,10 @@ const PALETTES = {
   ember: ['#F59E0B', '#EF4444', '#7C2D12', '#831843'],
 } as const;
 
-export function WaveBackground({ width: w, height: h, variant = 'magenta', dim }: Props) {
+export function WaveBackground({ width: w, height: h, variant = 'magenta', dim, bottomScrim }: Props) {
   const [c1, c2, c3, c4] = PALETTES[variant];
   const o = dim ? 0.55 : 1;
+  const scrimH = bottomScrim ?? 0;
   return (
     <Svg width={w} height={h} style={{ position: 'absolute' }}>
       <Defs>
@@ -35,6 +38,11 @@ export function WaveBackground({ width: w, height: h, variant = 'magenta', dim }
         <LinearGradient id="g3" x1="0" y1="1" x2="1" y2="0.2">
           <Stop offset="0" stopColor="#EEF3F5" stopOpacity={0.28 * o} />
           <Stop offset="1" stopColor="#EEF3F5" stopOpacity={0} />
+        </LinearGradient>
+        <LinearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#0A0A0C" stopOpacity={0} />
+          <Stop offset="0.65" stopColor="#0A0A0C" stopOpacity={0.82} />
+          <Stop offset="1" stopColor="#0A0A0C" stopOpacity={0.94} />
         </LinearGradient>
       </Defs>
       <Rect x={0} y={0} width={w} height={h} fill="#0A0A0C" />
@@ -55,6 +63,8 @@ export function WaveBackground({ width: w, height: h, variant = 'magenta', dim }
         strokeWidth={2.5}
         fill="none"
       />
+      {/* bottom fade so overlaid text is legible and the wave never ends in a hard seam */}
+      {scrimH > 0 && <Rect x={0} y={h - scrimH} width={w} height={scrimH} fill="url(#scrim)" />}
     </Svg>
   );
 }

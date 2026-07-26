@@ -21,7 +21,7 @@ export function Welcome() {
     <Screen style={{ flexGrow: 1, justifyContent: 'center' }}>
       <View style={{ alignItems: 'center', marginBottom: 32 }}>
         <Ionicons name="server-outline" size={56} color={c.accent.base} />
-        <Text style={[type.display, { color: c.text.primary, marginTop: 24, textAlign: 'center' }]}>
+        <Text style={[type.display, { color: '#FFFFFF', marginTop: 24, textAlign: 'center' }]}>
           Your Pi, from anywhere
         </Text>
         <Text style={[type.callout, { color: c.text.secondary, marginTop: 12, textAlign: 'center', maxWidth: 300 }]}>
