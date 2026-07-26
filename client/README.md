@@ -30,12 +30,33 @@ transport implements the same surface.
 
 ## Run
 
+**Native build (standalone "Raspberry App", no Expo Go):**
+
 ```sh
 cd client
 npm install
-npx expo start --ios   # Expo Go in the iOS Simulator
+npx expo run:ios --device "iPhone 16 Pro Max"   # prebuild → pods → xcodebuild → install
 ```
 
-In the simulator (no camera), pair with **"Use a demo Pi (no hardware)"** on the scan screen.
+This generates the native `ios/` project (git-ignored — regenerated on demand),
+builds a real `Raspberry App` and installs it to the simulator. A Debug build
+still loads JS from Metro (`npx expo start`); for a fully self-contained app add
+`--configuration Release`.
+
+**Expo Go (quicker for JS-only iteration):**
+
+```sh
+npx expo start --ios
+```
+
+In the simulator (no camera), pair with **"Use a demo Pi (no hardware)"** on the
+scan screen, or deep-link `pimon://demo/pair`.
+
+## Tests
+
+```sh
+npm test   # jest-expo — 42 unit tests over formatting, fingerprints, the
+           # metric generator and store mutations
+```
 
 Remote Desktop video (M4) is presented honestly as not-yet-available rather than faked.
