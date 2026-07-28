@@ -11,6 +11,7 @@ import { MetricChart } from '../../components/MetricChart';
 import { ActionButton } from '../../components/ActionButton';
 import { AlertRule, SeriesKey, Severity } from '../../types';
 import { sampleSeries, SERIES } from '../../sim/metrics';
+import { backtestSpans } from '../../sim/backtest';
 import { fmtClock, fmtDuration, fmtValue } from '../../lib/format';
 
 const EDITABLE: SeriesKey[] = ['cpu.temp_c', 'cpu.util_pct', 'mem.used_pct', 'disk.used_pct', 'load.1m'];
@@ -44,19 +45,7 @@ export function RuleEditor() {
   // Backtest: spans where the predicate held for at least the dwell.
   const backtest = useMemo(() => {
     if (thresholdInvalid || dwellInvalid) return null;
-    const stepS = (24 * 3600) / 240;
-    const spans: { from: number; to: number }[] = [];
-    let start: number | null = null;
-    for (const s of samples) {
-      const firing = op === 'above' ? s.v > th : s.v < th;
-      if (firing && start == null) start = s.t;
-      if (!firing && start != null) {
-        if ((s.t - start) / 1000 >= dw) spans.push({ from: start, to: s.t });
-        start = null;
-      }
-    }
-    if (start != null && (Date.now() - start) / 1000 >= dw) spans.push({ from: start, to: Date.now() });
-    return { spans, stepS };
+    return { spans: backtestSpans(samples, { op, threshold: th, dwellS: dw }, Date.now()) };
   }, [samples, th, dw, op, thresholdInvalid, dwellInvalid]);
 
   const save = () => {

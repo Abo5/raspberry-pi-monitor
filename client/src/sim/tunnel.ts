@@ -5,6 +5,7 @@
 import { useStore } from '../store/useStore';
 import { Alert, AlertRule, SeriesKey, Snapshot } from '../types';
 import { metricValue, SERIES } from './metrics';
+import { ruleTransition } from './rules';
 import { fmtValue } from '../lib/format';
 
 let snapTimer: ReturnType<typeof setInterval> | null = null;
@@ -68,26 +69,22 @@ function evaluateRules(values: Snapshot['values'], now: number) {
     if (!rule.enabled) continue;
     const v = values[rule.seriesKey];
     if (v == null) continue;
-    const firing = rule.op === 'above' ? v > rule.threshold : v < rule.threshold;
     const open = next.find((a) => a.ruleId === rule.id && a.resolvedAt == null);
-    if (firing) {
-      if (!overSince[rule.id]) overSince[rule.id] = now;
-      const heldS = (now - (overSince[rule.id] ?? now)) / 1000;
-      if (!open && heldS >= rule.dwellS) {
-        next = [makeAlert(rule, v, now, currentAgentId ?? ''), ...next];
-        changed = true;
-        S().addEvent('WARN', `alert fired: ${alertTitle(rule)}`);
-      } else if (open && (v > open.peak.v) === (rule.op === 'above')) {
-        next = next.map((a) => (a.id === open.id ? { ...a, peak: { v, t: now } } : a));
-        changed = true;
-      }
-    } else {
-      delete overSince[rule.id];
-      if (open) {
-        next = next.map((a) => (a.id === open.id ? { ...a, resolvedAt: now } : a));
-        changed = true;
-        S().addEvent('INFO', `alert resolved: ${alertTitle(rule)}`);
-      }
+    const decision = ruleTransition(rule, v, now, overSince[rule.id] ?? null, open);
+    if (decision.overSince == null) delete overSince[rule.id];
+    else overSince[rule.id] = decision.overSince;
+
+    if (decision.kind === 'fire') {
+      next = [makeAlert(rule, v, now, currentAgentId ?? ''), ...next];
+      changed = true;
+      S().addEvent('WARN', `alert fired: ${alertTitle(rule)}`);
+    } else if (decision.kind === 'update-peak' && open) {
+      next = next.map((a) => (a.id === open.id ? { ...a, peak: { v, t: now } } : a));
+      changed = true;
+    } else if (decision.kind === 'resolve' && open) {
+      next = next.map((a) => (a.id === open.id ? { ...a, resolvedAt: now } : a));
+      changed = true;
+      S().addEvent('INFO', `alert resolved: ${alertTitle(rule)}`);
     }
   }
   if (changed) S().set({ alerts: next });
