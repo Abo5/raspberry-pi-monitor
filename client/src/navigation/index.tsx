@@ -3,7 +3,8 @@
 // count; Control shows a dot while a shell session runs.
 import React, { useEffect } from 'react';
 import * as Linking from 'expo-linking';
-import { DarkTheme, DefaultTheme, NavigationContainer, getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer, createNavigationContainerRef, getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import { CAPTURE_ENABLED, CAPTURE_FIRST_MS, CAPTURE_STEP_MS, CAPTURE_STEPS } from '../dev/capture';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -392,10 +393,42 @@ function useDemoPairLink() {
   }, [url]);
 }
 
+const navigationRef = createNavigationContainerRef<any>();
+
+/** Dev-only: walks every screen on a timer so a full screenshot set can be
+ * captured without taps. No-op unless CAPTURE_ENABLED (src/dev/capture.ts). */
+function useCaptureRunner() {
+  useEffect(() => {
+    if (!CAPTURE_ENABLED) return;
+    let i = 0;
+    const go = () => {
+      const step = CAPTURE_STEPS[i % CAPTURE_STEPS.length];
+      if (navigationRef.isReady()) navigationRef.navigate(step.target[0], step.target[1]);
+      // eslint-disable-next-line no-console
+      console.log(`[capture] ${step.name}`);
+      i++;
+    };
+    // Fixed first-nav delay so an external screenshot loop can phase-lock.
+    let started = false;
+    const first = setTimeout(() => {
+      started = true;
+      go();
+    }, CAPTURE_FIRST_MS);
+    const t = setInterval(() => {
+      if (started) go();
+    }, CAPTURE_STEP_MS);
+    return () => {
+      clearInterval(t);
+      clearTimeout(first);
+    };
+  }, []);
+}
+
 export function RootNavigation() {
   const { c, isDark } = useTheme();
   const paired = useStore((s) => s.paired);
   useDemoPairLink();
+  useCaptureRunner();
 
   const navTheme = {
     ...(isDark ? DarkTheme : DefaultTheme),
@@ -410,7 +443,7 @@ export function RootNavigation() {
   };
 
   return (
-    <NavigationContainer theme={navTheme} linking={paired ? linking : undefined}>
+    <NavigationContainer ref={navigationRef} theme={navTheme} linking={paired && !CAPTURE_ENABLED ? linking : undefined}>
       {paired ? <MainTabs /> : <OnboardingStack />}
     </NavigationContainer>
   );

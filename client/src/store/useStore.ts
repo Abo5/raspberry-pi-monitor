@@ -68,12 +68,24 @@ interface State {
   toggleWidget: (id: string) => void;
 }
 
+import { CAPTURE_ENABLED } from '../dev/capture';
+
+const CAPTURE_AGENT = {
+  id: 'agent-demo', name: 'pi5-livingroom', hostname: 'pi5-livingroom',
+  model: 'Raspberry Pi 5 · 8 GB', os: 'Raspberry Pi OS Trixie (64-bit)',
+  agentVersion: '1.0.0', fingerprintHex: '9F2C4A81D30E77B51CE488026BAFD915',
+  fingerprintWords: ['anchor', 'velvet', 'piston', 'marina', 'cobalt', 'thistle'],
+  pairedAt: Date.now() - 200_000_000, verifiedAt: Date.now() - 200_000_000,
+};
+
 export const useStore = create<State>((set, get) => ({
-  hydrated: false,
-  paired: false,
-  agents: [],
-  currentAgentId: null,
-  devices: [],
+  hydrated: CAPTURE_ENABLED,
+  paired: CAPTURE_ENABLED,
+  agents: CAPTURE_ENABLED ? [CAPTURE_AGENT] : [],
+  currentAgentId: CAPTURE_ENABLED ? 'agent-demo' : null,
+  devices: CAPTURE_ENABLED
+    ? [{ id: 'this-device', name: 'iPhone', isThisDevice: true, pairedAt: Date.now(), lastSeen: Date.now() }]
+    : [],
 
   connection: { kind: 'unknown' },
   rttHistory: [],
@@ -82,10 +94,10 @@ export const useStore = create<State>((set, get) => ({
 
   dashboardRange: '1h',
 
-  rules: [],
+  rules: CAPTURE_ENABLED ? require('../sim/seed').DEFAULT_RULES : [],
   alerts: [],
 
-  actions: [],
+  actions: CAPTURE_ENABLED ? require('../sim/seed').DEFAULT_ACTIONS : [],
   runningActionId: null,
   rebootWatch: null,
 
