@@ -1,65 +1,80 @@
-# raspberry-pi-monitor
+# Raspberry App
 
-**Specification-only repository.** No implementation code — this repo defines *what* to build and *why*, so that implementation can begin cleanly on macOS/Xcode.
+Private, secure remote **monitoring and control of a Raspberry Pi from an
+iPhone** — live telemetry, an interactive shell, allow-listed actions, alerts,
+widgets, and a remote-desktop-style connect flow. Only your phone and your Pi
+hold the keys; no cloud account owns your data.
 
-An end-to-end encrypted iOS application for remote control, remote GUI access, shell access, and continuous telemetry of a Raspberry Pi, from anywhere on the internet.
+Styled after Microsoft's "Windows App": pure-black canvas, bloom-wave device
+cards, a floating pill tab bar, and a royal-purple accent.
 
 ---
 
-## 1. Product in one paragraph
+## Repository layout
 
-A Raspberry Pi runs a small always-on daemon (the **Agent**). An iPhone app (the **Client**) pairs with that Agent once, over a QR code, and from then on can reach it from any network on earth. The two endpoints hold the only keys: a zero-knowledge **Rendezvous** service helps them find each other and relays bytes when direct connection is impossible, but it can never read, replay, or forge a single byte of the session. Through that tunnel the user gets a live remote desktop, an interactive terminal, a metrics dashboard, historical charts, alerting, and Home Screen / Lock Screen widgets.
-
-## 2. Non-negotiable principles
-
-| # | Principle |
-|---|---|
-| P1 | **End-to-end encrypted, always.** No server-side plaintext at any point, including push notification payloads and TURN relaying. |
-| P2 | **No inbound ports.** The Agent never listens on a public port. All connections are outbound-initiated from both sides. |
-| P3 | **Explicit trust.** A device is only trusted after an out-of-band pairing with a verifiable key fingerprint. |
-| P4 | **The Pi is the source of truth.** History, config, and policy live on the Pi, not in a cloud account. |
-| P5 | **Degrade, never fail closed on observability.** If the tunnel drops, the Agent keeps recording locally and backfills on reconnect. |
-
-## 3. Document index
-
-Read in this order.
-
-| # | Document | Purpose |
+| Path | What it is | Status |
 |---|---|---|
-| 00 | [Glossary](docs/00-GLOSSARY.md) | Shared vocabulary. Read first — every other doc assumes it. |
-| 01 | [BRD](docs/01-BRD.md) | Business Requirements: problem, goals, scope, success metrics, stakeholders. |
-| 02 | [SRS](docs/02-SRS.md) | Software Requirements Specification: numbered functional + non-functional requirements, use cases, traceability. |
-| 03 | [Architecture](docs/03-ARCHITECTURE.md) | Components, deployment topology, technology selection, data flow. |
-| 04 | [Security & E2EE Design](docs/04-SECURITY-E2EE.md) | Threat model, key hierarchy, pairing, cryptographic construction. |
-| 05 | [Wire Protocol](docs/05-PROTOCOL.md) | Framing, channel multiplexing, message schemas, error codes. |
-| 06 | [Data Model](docs/06-DATA-MODEL.md) | Agent-side schema, retention, downsampling, client cache. |
-| 07 | [UX Specification](docs/07-UX-SPEC.md) | Screen-by-screen definition, navigation, states, accessibility. |
-| 08 | [Widgets & Live Activities](docs/08-WIDGETS.md) | WidgetKit families, timeline strategy, data path. |
-| 09 | [Test Plan](docs/09-TEST-PLAN.md) | Test strategy, environments, acceptance criteria per requirement. |
-| 10 | [Roadmap](docs/10-ROADMAP.md) | Phased delivery, milestones, definition of done. |
-| 11 | [Agent Deployment](docs/11-AGENT-DEPLOYMENT.md) | Installing, hardening, and operating the Agent on the Pi. |
-| 12 | [Risk Register](docs/12-RISK-REGISTER.md) | Technical, security, and delivery risks with mitigations. |
-| 13 | [Design System](docs/13-DESIGN-SYSTEM.md) | Color tokens, typography, spacing, components, motion, data-viz and accessibility foundations. |
-| 14 | [Open Decisions](docs/14-OPEN-DECISIONS.md) | **Read before writing code.** Cross-cutting questions that must be closed in M0. |
-| — | [ADRs](docs/adr/) | Architecture Decision Records — the reasoning behind each irreversible choice. |
+| [`client/`](client) | The iOS app — React Native (Expo SDK 57) + TypeScript. | ✅ Built. Telemetry is currently **simulated** in-app; 65 unit tests. |
+| [`agent/`](agent) | The Pi daemon — Rust. Samples real metrics and serves them + an interactive shell over a local HTTP/WS API. | ✅ Phase-1 built & compiles (`cargo check` clean). |
+| [`rendezvous/`](planning/06-RENDEZVOUS.md) | Zero-knowledge relay so the phone reaches the Pi from anywhere. | ⬜ Spec only (Track B). |
+| [`planning/`](planning) | Current, implementation-ready docs: BRD, SRS, TRD, architecture, agent/rendezvous specs, protocol, data model, security, plan, local-MVP guide. | ✅ |
+| [`docs/`](docs) | The original deep-design specification (threat model, wire framing, design system) — reference. | ✅ |
 
-## 4. Target platform baseline
+## What the app does today
 
-| Side | Baseline |
-|---|---|
-| Client | iOS 17.0+, iPhone. Swift 6, SwiftUI, WidgetKit. Built on macOS with Xcode 16+. |
-| Agent | Raspberry Pi 4 / 5, 64-bit Raspberry Pi OS Bookworm or Trixie, Wayland (labwc/wayfire) session. Rust, single static binary + systemd unit. |
-| Rendezvous | Any small VPS or edge runtime. Stateless. Rust or Go. |
+- **Devices** home — your paired Pis as bloom-wave cards; tap to connect.
+- **Sign-in flow** — RDP-style: enter username/password (or save them and never
+  be asked again), then connect straight into a remote session.
+- **Monitor** — live dashboard: CPU, SoC temperature, memory, disk, network,
+  with sparklines, a disk gauge, and a temperature chart with 80/85 °C
+  thresholds; metric-detail screens with history + stats.
+- **Control** — remote shell (interactive terminal), allow-listed actions with a
+  four-gate destructive-confirmation flow, and a reboot watch that advances on
+  real events.
+- **Alerts** — rules with a live "would have fired N times" backtest, an alerts
+  list, and detail with the data behind each fire.
+- **Widgets** — a gallery of 35 Home/Lock-Screen widget designs.
+- **Settings** — security, appearance, data & retention, diagnostics.
 
-## 5. Status
+> Telemetry, the desktop stream, and the tunnel are **simulated** in the client
+> today (`client/src/sim/`). The `agent/` daemon already serves **real** metrics
+> and a **real** shell over its local API — wiring the client to it is the next
+> step (see [`planning/11-LOCAL-MVP.md`](planning/11-LOCAL-MVP.md)).
 
-| Phase | State |
-|---|---|
-| Requirements & design | ✅ This repository |
-| Agent implementation | ⬜ Not started |
-| iOS implementation | ⬜ Not started |
-| Rendezvous implementation | ⬜ Not started |
+## Run the app (iOS Simulator)
 
-## 6. License
+```sh
+cd client
+npm install
+npx expo run:ios --device "iPhone 16 Pro Max"   # native build (no Expo Go)
+# or, for quick JS-only iteration:
+npx expo start --ios
+npm test                                         # 65 Jest tests
+```
+
+## Run the Agent (on a Pi, or a host for a smoke test)
+
+```sh
+cd agent
+cargo run          # prints a pairing QR { ip, port, token } and serves the API
+# GET /snapshot, /series, /agent ; WS /telemetry, /shell  (bearer-token auth)
+```
+
+## Principles
+
+1. **End-to-end encrypted** (Track B) — no server-side plaintext, ever.
+2. **No inbound ports** on the Pi in the final product (the LAN MVP is the one
+   documented exception).
+3. **Explicit trust** — pairing with a verified key fingerprint.
+4. **The Pi is the source of truth** — history and config live on the Pi.
+5. **Degrade, never fake** — gaps and staleness are always shown honestly.
+
+## Roadmap (short)
+
+P1 LAN MVP (real telemetry + shell) → P2 storage + actions + alerts → P3 internet
++ E2EE + Rendezvous → P4 push + widgets → P5 remote desktop → P6 hardening +
+release. Full plan in [`planning/10-IMPLEMENTATION-PLAN.md`](planning/10-IMPLEMENTATION-PLAN.md).
+
+## License
 
 MIT — see [LICENSE](LICENSE).
