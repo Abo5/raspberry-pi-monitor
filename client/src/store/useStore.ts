@@ -52,6 +52,9 @@ interface State {
   /** Widget designs the user picked in the gallery (design ids). */
   selectedWidgets: string[];
 
+  /** Saved sign-in per Agent. Presence = "don't ask again". */
+  credentials: Record<string, { username: string; password: string }>;
+
   settings: Settings;
 
   // mutations
@@ -60,6 +63,8 @@ interface State {
   addEvent: (level: LogEvent['level'], message: string) => void;
   pairAgent: (agent: Agent) => void;
   unpairCurrent: () => void;
+  saveCredentials: (agentId: string, username: string, password: string) => void;
+  clearCredentials: (agentId: string) => void;
   ackAlert: (id: string) => void;
   snoozeAlert: (id: string, untilMs: number) => void;
   upsertRule: (rule: AlertRule) => void;
@@ -107,6 +112,8 @@ export const useStore = create<State>((set, get) => ({
   firstRunCardDismissed: false,
 
   selectedWidgets: [],
+
+  credentials: {},
 
   settings: {
     theme: 'system',
@@ -174,6 +181,15 @@ export const useStore = create<State>((set, get) => ({
   deleteRule: (id) => set({ rules: get().rules.filter((r) => r.id !== id) }),
 
   appendShell: (lines) => set({ shellBuffer: [...get().shellBuffer, ...lines].slice(-10_000) }),
+
+  saveCredentials: (agentId, username, password) =>
+    set({ credentials: { ...get().credentials, [agentId]: { username, password } } }),
+
+  clearCredentials: (agentId) => {
+    const next = { ...get().credentials };
+    delete next[agentId];
+    set({ credentials: next });
+  },
 
   toggleWidget: (id) => {
     const cur = get().selectedWidgets;

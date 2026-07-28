@@ -66,7 +66,15 @@ export function DevicesHome() {
   const connection = useStore((s) => s.connection);
   const snapshot = useStore((s) => s.snapshot);
   const alerts = useStore((s) => s.alerts);
+  const credentials = useStore((s) => s.credentials);
   const [showSwitcher, setShowSwitcher] = useState(false);
+
+  // Tap a device → connect straight in if credentials are saved (RDP-style
+  // "don't ask again"), otherwise prompt for sign-in first.
+  const openDevice = (agentId: string) => {
+    if (credentials[agentId]) nav.navigate('Connect', { agentId });
+    else nav.navigate('Credentials', { agentId });
+  };
 
   const unacked = alerts.filter((a) => a.resolvedAt == null && a.acknowledgedAt == null).length;
   const cardW = width - 32;
@@ -105,7 +113,7 @@ export function DevicesHome() {
               return (
                 <Pressable
                   key={agent.id}
-                  onPress={() => nav.navigate('Connect', { agentId: agent.id })}
+                  onPress={() => openDevice(agent.id)}
                   onLongPress={() => nav.navigate('AgentDetail', { agentId: agent.id })}
                   accessibilityRole="button"
                   accessibilityLabel={`Connect to ${agent.name}`}

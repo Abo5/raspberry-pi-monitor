@@ -37,8 +37,8 @@ export function ConnectScreen() {
   useEffect(() => {
     if (connection.kind === 'connected') {
       const t = setTimeout(() => {
-        nav.goBack();
-        nav.navigate('MonitorTab');
+        // Straight into the remote screen (RDP-style), replacing the progress.
+        nav.replace('RemoteSession', { agentId });
       }, 700);
       return () => clearTimeout(t);
     }

@@ -22,9 +22,13 @@ export function AgentDetail() {
   const connection = useStore((s) => s.connection);
   const snapshot = useStore((s) => s.snapshot);
   const unpairCurrent = useStore((s) => s.unpairCurrent);
+  const credentials = useStore((s) => s.credentials);
+  const clearCredentials = useStore((s) => s.clearCredentials);
   const [confirmUnpair, setConfirmUnpair] = useState(false);
 
   if (!agent) return <Screen><Text /></Screen>;
+
+  const savedCreds = credentials[agent.id];
 
   const connected = isCurrent && connection.kind === 'connected';
   const uptime = snapshot?.values['sys.uptime_s'];
@@ -64,6 +68,29 @@ export function AgentDetail() {
           right={!connected ? <StatusPill status="offline" label="OFFLINE" size="compact" /> : undefined}
         />
         <ListRow title="Diagnostics" chevron onPress={() => nav.navigate('Diagnostics')} last />
+      </Card>
+
+      <Eyebrow>SIGN-IN</Eyebrow>
+      <Card>
+        {savedCreds ? (
+          <>
+            <ListRow title="Saved username" value={savedCreds.username} />
+            <ListRow
+              title="Change sign-in"
+              chevron
+              onPress={() => nav.navigate('Credentials', { agentId: agent.id })}
+            />
+            <ListRow title="Forget saved sign-in" destructive onPress={() => clearCredentials(agent.id)} last />
+          </>
+        ) : (
+          <ListRow
+            title="Save sign-in for this Pi"
+            subtitle="Connect once with credentials to save them"
+            chevron
+            onPress={() => nav.navigate('Credentials', { agentId: agent.id })}
+            last
+          />
+        )}
       </Card>
 
       <Eyebrow>STORAGE</Eyebrow>

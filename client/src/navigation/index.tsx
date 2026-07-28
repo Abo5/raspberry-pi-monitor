@@ -16,6 +16,8 @@ import { useStore } from '../store/useStore';
 import { startTunnel } from '../sim/tunnel';
 import { DevicesHome } from '../screens/devices/DevicesHome';
 import { ConnectScreen } from '../screens/devices/ConnectScreen';
+import { CredentialsScreen } from '../screens/devices/CredentialsScreen';
+import { RemoteSession } from '../screens/devices/RemoteSession';
 import { WidgetGallery } from '../screens/widgets/WidgetGallery';
 
 import { Welcome } from '../screens/onboarding/Welcome';
@@ -68,7 +70,9 @@ function DevicesStack() {
   return (
     <Stack.Navigator screenOptions={opts}>
       <Stack.Screen name="DevicesHome" component={DevicesHome} options={{ headerShown: false }} />
+      <Stack.Screen name="Credentials" component={CredentialsScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
       <Stack.Screen name="Connect" component={ConnectScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="RemoteSession" component={RemoteSession} options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
       <Stack.Screen name="AgentList" component={AgentList} options={{ title: 'Pis' }} />
       <Stack.Screen name="AgentDetail" component={AgentDetail} options={{ title: 'About this Pi' }} />
       <Stack.Screen name="Diagnostics" component={Diagnostics} />
@@ -338,7 +342,9 @@ const linking: any = {
       DevicesTab: {
         screens: {
           DevicesHome: 'home',
+          Credentials: 'signin/:agentId',
           Connect: 'connect/:agentId',
+          RemoteSession: 'remote/:agentId',
           AgentList: 'agents',
           AgentDetail: 'agent/:agentId',
         },
