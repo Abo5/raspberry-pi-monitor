@@ -15,7 +15,8 @@ interface Props {
 
 const PALETTES = {
   magenta: ['#8B5CF6', '#D946EF', '#701A45', '#3B2E8C'],
-  cyan: ['#2FBCCF', '#5AD0E0', '#0E4A64', '#123B8C'],
+  // was turquoise — now a deep indigo so no card reads as light-blue.
+  cyan: ['#6D5CE0', '#8B78DE', '#2A2368', '#4B2E8C'],
   violet: ['#7C6CE0', '#A78BFA', '#3B2E8C', '#5B21B6'],
   ember: ['#F59E0B', '#EF4444', '#7C2D12', '#831843'],
 } as const;

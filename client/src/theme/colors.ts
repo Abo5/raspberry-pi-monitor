@@ -83,15 +83,16 @@ export const dark: ColorTokens = {
     secondary: '#A7B4BC',
     tertiary: '#85929A',
     disabled: '#4E5A62',
-    onAccent: '#04191C',
+    onAccent: '#FFFFFF',
     onCritical: '#140605',
   },
+  // Royal purple — replaces Signal Cyan. Ties the accent to the purple bloom cards.
   accent: {
-    base: '#2FBCCF',
-    high: '#5AD0E0',
-    pressed: '#1E93A3',
-    muted: '#0E6874',
-    washAlpha: 0.12,
+    base: '#8A6BEA',
+    high: '#A88FF4',
+    pressed: '#6E4FD2',
+    muted: '#2C2360',
+    washAlpha: 0.16,
   },
   status: {
     ok: '#2FB463',
@@ -105,11 +106,14 @@ export const dark: ColorTokens = {
     steps: ['#E6B731', '#E89400', '#E76E08', '#DB4822', '#C9222B'],
   },
   viz: {
+    // Slot 1 (primary series / sparklines) wears the accent purple; the old
+    // cyan moves to slot 3 (only shows at 3+ series, which the app doesn't render).
     categorical: [
-      '#10A6AD', '#D67523', '#8B78DE', '#2E9E52',
+      '#8A6BEA', '#D67523', '#10A6AD', '#2E9E52',
       '#CF60A4', '#AB9017', '#4687D8', '#D7564D',
     ],
-    sequential: ['#B7E4EA', '#8FD3DD', '#63C0CD', '#2FA9BA', '#0B8B9B', '#046F7C', '#01545E'],
+    // Purple sequential ramp (gauges, heatmaps) — was cyan.
+    sequential: ['#E4DBFA', '#C6B4F4', '#A88DEE', '#8A6BEA', '#6E4FD2', '#523AA6', '#392877'],
     gridline: '#1E262D',
     axis: '#2E3941',
     tick: '#85929A',
@@ -152,11 +156,12 @@ export const light: ColorTokens = {
     onAccent: '#FFFFFF',
     onCritical: '#FFFFFF',
   },
+  // Royal purple (deep, ~7:1 on white) — replaces the dark teal.
   accent: {
-    base: '#026E77',
-    high: '#0A8B96',
-    pressed: '#015159',
-    muted: '#B7E4EA',
+    base: '#6A3DD0',
+    high: '#8258E0',
+    pressed: '#522BAE',
+    muted: '#E7DEFB',
     washAlpha: 0.1,
   },
   status: {
@@ -172,10 +177,10 @@ export const light: ColorTokens = {
   },
   viz: {
     categorical: [
-      '#00999F', '#B65E07', '#7838F8', '#08833C',
+      '#6A3DD0', '#B65E07', '#00999F', '#08833C',
       '#C60F91', '#8B7404', '#0D6BCC', '#C70A18',
     ],
-    sequential: ['#B7E4EA', '#8FD3DD', '#63C0CD', '#2FA9BA', '#0B8B9B', '#046F7C', '#01545E'],
+    sequential: ['#EDE6FC', '#D3C4F6', '#B79CEE', '#9573E6', '#6A3DD0', '#522BAE', '#3A1E82'],
     gridline: '#E7ECEF',
     axis: '#CBD4D9',
     tick: '#5E6C74',

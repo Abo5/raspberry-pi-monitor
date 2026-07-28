@@ -107,7 +107,7 @@ function WidgetCell({
   agentName: string;
   onWallpaper?: boolean;
 }) {
-  const { type } = useTheme();
+  const { type, c } = useTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -131,14 +131,14 @@ function WidgetCell({
               width: 24,
               height: 24,
               borderRadius: 12,
-              backgroundColor: '#2FBCCF',
+              backgroundColor: c.accent.base,
               alignItems: 'center',
               justifyContent: 'center',
               borderWidth: 2,
               borderColor: '#000000',
             }}
           >
-            <Ionicons name="checkmark" size={14} color="#04191C" />
+            <Ionicons name="checkmark" size={14} color={c.text.onAccent} />
           </View>
         )}
       </View>
