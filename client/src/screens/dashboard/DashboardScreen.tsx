@@ -70,7 +70,8 @@ export function DashboardScreen() {
       {/* Header: AgentChip title + menu */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}>
         <TouchableOpacity
-          style={{ flexDirection: 'row', alignItems: 'center' }}
+          style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingRight: 8 }}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           onPress={() => setShowSwitcher(true)}
           accessibilityRole="button"
         >
@@ -78,8 +79,13 @@ export function DashboardScreen() {
           <Ionicons name="chevron-down" size={16} color={c.text.tertiary} style={{ marginLeft: 4 }} />
         </TouchableOpacity>
         <View style={{ flex: 1 }} />
-        <TouchableOpacity onPress={() => nav.navigate('Diagnostics')} accessibilityRole="button">
-          <Ionicons name="ellipsis-horizontal" size={20} color={c.text.secondary} />
+        <TouchableOpacity
+          onPress={() => nav.navigate('Diagnostics')}
+          accessibilityRole="button"
+          hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+          style={{ padding: 6 }}
+        >
+          <Ionicons name="ellipsis-horizontal" size={22} color={c.text.secondary} />
         </TouchableOpacity>
       </View>
 
@@ -179,7 +185,7 @@ export function DashboardScreen() {
               onPress={() => setStore({ firstRunCardDismissed: true })}
               accessibilityRole="button"
               accessibilityLabel="Dismiss"
-              hitSlop={8}
+              hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
             >
               <Ionicons name="close" size={16} color={c.text.tertiary} />
             </TouchableOpacity>

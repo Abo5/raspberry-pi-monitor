@@ -23,6 +23,7 @@ function CircleButton({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
+      hitSlop={8}
       style={({ pressed }) => ({
         width: 46,
         height: 46,
