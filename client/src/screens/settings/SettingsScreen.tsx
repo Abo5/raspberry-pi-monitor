@@ -17,7 +17,7 @@ export function SettingsScreen() {
 
   return (
     <Screen>
-      <Eyebrow>PIS</Eyebrow>
+      <Eyebrow>YOUR PIS</Eyebrow>
       <Card>
         <ListRow
           title={agent?.name ?? '—'}

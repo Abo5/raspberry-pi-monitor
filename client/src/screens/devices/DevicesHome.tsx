@@ -173,6 +173,28 @@ export function DevicesHome() {
                 </Pressable>
               );
             })}
+
+            {/* Add-device affordance so the list never reads as sparse/empty */}
+            <Pressable
+              onPress={() => nav.navigate('ScanQR')}
+              accessibilityRole="button"
+              accessibilityLabel="Pair another Pi"
+              style={({ pressed }) => ({
+                height: 88,
+                borderRadius: 24,
+                borderWidth: 1.5,
+                borderColor: pressed ? '#3A3A40' : '#242428',
+                borderStyle: 'dashed',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'row',
+                gap: 10,
+                backgroundColor: pressed ? '#141416' : 'transparent',
+              })}
+            >
+              <Ionicons name="add-circle-outline" size={22} color="#8A8A90" />
+              <Text style={[type.body, { color: '#B4B4BA', fontWeight: '600' }]}>Pair another Pi</Text>
+            </Pressable>
           </View>
         )}
       </ScrollView>

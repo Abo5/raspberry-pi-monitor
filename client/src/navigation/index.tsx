@@ -8,7 +8,8 @@ import { CAPTURE_ENABLED, CAPTURE_FIRST_MS, CAPTURE_STEP_MS, CAPTURE_STEPS } fro
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View, useWindowDimensions } from 'react-native';
+import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme';
 import { useStore } from '../store/useStore';
@@ -56,6 +57,8 @@ function useStackOptions() {
     headerTintColor: c.text.primary,
     headerTitleStyle: { ...type.bodyEmph, color: c.text.primary },
     headerShadowVisible: false,
+    // Chevron-only back button — avoids route-name labels like "DevicesHome".
+    headerBackButtonDisplayMode: 'minimal',
     contentStyle: { backgroundColor: c.surface.canvas },
   } as const;
 }
@@ -178,6 +181,7 @@ const TAB_ROOTS: Record<string, string> = {
 function PillTabBar({ state, navigation }: any) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const shellOpen = useStore((s) => s.shellSessionStartedAt != null);
   const activeRoute = state.routes[state.index];
   const activeName = activeRoute?.name;
@@ -187,7 +191,24 @@ function PillTabBar({ state, navigation }: any) {
   const focusedScreen = getFocusedRouteNameFromRoute(activeRoute) ?? TAB_ROOTS[activeName];
   if (focusedScreen !== TAB_ROOTS[activeName]) return null;
 
+  const fadeH = Math.max(insets.bottom, 12) + 58 + 28;
+
   return (
+    <>
+      {/* Bottom fade so scroll content dissolves behind the bar instead of
+          being hard-clipped by it. */}
+      <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: fadeH }}>
+        <Svg width={width} height={fadeH}>
+          <Defs>
+            <SvgGradient id="tabfade" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#000000" stopOpacity={0} />
+              <Stop offset="0.55" stopColor="#000000" stopOpacity={0.7} />
+              <Stop offset="1" stopColor="#000000" stopOpacity={0.96} />
+            </SvgGradient>
+          </Defs>
+          <Rect x={0} y={0} width={width} height={fadeH} fill="url(#tabfade)" />
+        </Svg>
+      </View>
     <View
       pointerEvents="box-none"
       style={{
@@ -269,6 +290,7 @@ function PillTabBar({ state, navigation }: any) {
         <Ionicons name="settings-outline" size={22} color="#EDEDF0" />
       </Pressable>
     </View>
+    </>
   );
 }
 

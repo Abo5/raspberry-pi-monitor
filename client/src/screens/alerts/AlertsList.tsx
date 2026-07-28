@@ -1,6 +1,6 @@
 // Alerts list (§13.1): Active / History segments, severity-then-recency sort.
 // The good empty state reads like good news.
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme, withAlpha } from '../../theme';
@@ -8,7 +8,6 @@ import { useStore } from '../../store/useStore';
 import { Screen } from '../../components/Shared';
 import { AlertRow } from '../../components/AlertRow';
 import { EmptyState } from '../../components/States';
-import { ActionButton } from '../../components/ActionButton';
 
 const SEV_ORDER = { critical: 0, warning: 1, info: 2 };
 
@@ -19,6 +18,18 @@ export function AlertsList() {
   const alerts = useStore((s) => s.alerts);
   const [segment, setSegment] = useState<'active' | 'history'>('active');
 
+  // "Rules" is a standard trailing header button, not a control floating next
+  // to the segmented pill.
+  useLayoutEffect(() => {
+    nav.setOptions({
+      headerRight: () => (
+        <Pressable onPress={() => nav.navigate('Rules')} accessibilityRole="button" hitSlop={8}>
+          <Text style={[type.bodyEmph, { color: c.accent.base }]}>Rules</Text>
+        </Pressable>
+      ),
+    });
+  }, [nav, c.accent.base]);
+
   const active = alerts
     .filter((a) => a.resolvedAt == null)
     .sort((a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity] || b.firedAt - a.firedAt);
@@ -27,40 +38,37 @@ export function AlertsList() {
 
   return (
     <Screen>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-        <View
-          style={{
-            flexDirection: 'row',
-            flex: 1,
-            backgroundColor: c.surface.raised,
-            borderRadius: radius.s,
-            borderWidth: 1,
-            borderColor: c.border.subtle,
-            padding: 2,
-          }}
-        >
-          {(['active', 'history'] as const).map((seg) => (
-            <Pressable
-              key={seg}
-              onPress={() => setSegment(seg)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: segment === seg }}
-              style={{
-                flex: 1,
-                height: 32,
-                borderRadius: radius.s - 2,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: segment === seg ? withAlpha(c.accent.base, c.accent.washAlpha) : 'transparent',
-              }}
-            >
-              <Text style={[type.subhead, { color: segment === seg ? c.accent.base : c.text.secondary, fontWeight: '600' }]}>
-                {seg === 'active' ? `Active (${active.length})` : 'History'}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <ActionButton label="Rules" variant="tertiary" onPress={() => nav.navigate('Rules')} />
+      <View
+        style={{
+          flexDirection: 'row',
+          backgroundColor: c.surface.raised,
+          borderRadius: radius.s,
+          borderWidth: 1,
+          borderColor: c.border.subtle,
+          padding: 2,
+          marginBottom: 16,
+        }}
+      >
+        {(['active', 'history'] as const).map((seg) => (
+          <Pressable
+            key={seg}
+            onPress={() => setSegment(seg)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: segment === seg }}
+            style={{
+              flex: 1,
+              height: 32,
+              borderRadius: radius.s - 2,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: segment === seg ? withAlpha(c.accent.base, c.accent.washAlpha) : 'transparent',
+            }}
+          >
+            <Text style={[type.subhead, { color: segment === seg ? c.accent.base : c.text.secondary, fontWeight: '600' }]}>
+              {seg === 'active' ? `Active (${active.length})` : 'History'}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
       {shown.length === 0 ? (

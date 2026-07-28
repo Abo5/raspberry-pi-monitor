@@ -1,16 +1,20 @@
 // Small shared primitives: Screen, Card, Eyebrow, ListRow.
 import React from 'react';
 import { Pressable, ScrollView, Text, View, ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme';
 
 export function Screen({ children, scroll = true, style }: { children: React.ReactNode; scroll?: boolean; style?: ViewStyle }) {
   const { c } = useTheme();
+  const insets = useSafeAreaInsets();
   if (!scroll) return <View style={[{ flex: 1, backgroundColor: c.surface.canvas }, style]}>{children}</View>;
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: c.surface.canvas }}
-      contentContainerStyle={[{ padding: 16, paddingBottom: 120 }, style]}
+      // Clears the floating pill bar on tab-root screens and the home indicator
+      // on pushed screens, so the last row / primary button is always reachable.
+      contentContainerStyle={[{ padding: 16, paddingBottom: 120 + insets.bottom }, style]}
     >
       {children}
     </ScrollView>

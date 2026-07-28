@@ -10,6 +10,7 @@ import { useStore } from '../../store/useStore';
 import { Screen, Card, ListRow, Eyebrow } from '../../components/Shared';
 import { ConnectionBanner } from '../../components/ConnectionBanner';
 import { DestructiveConfirm } from '../../components/DestructiveConfirm';
+import { EmptyState } from '../../components/States';
 import { runAction } from '../../sim/tunnel';
 import { AgentAction } from '../../types';
 import { fmtClock, fmtDuration } from '../../lib/format';
@@ -56,6 +57,14 @@ export function ActionsScreen() {
         <Text style={[type.footnote, { color: c.text.secondary }]}>
           These are the only operations this Pi will accept. The list is set on the Pi.
         </Text>
+
+        {actions.length === 0 && (
+          <EmptyState
+            icon="flash-outline"
+            title="No actions are configured"
+            body="Actions are set on the Pi itself, in the Agent's config file."
+          />
+        )}
 
         {categories.map((cat) => {
           const items = actions.filter((a) => a.category === cat);
