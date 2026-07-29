@@ -18,6 +18,7 @@ const FIELDS = [
   'firstRunCardDismissed',
   'selectedWidgets',
   'credentials',
+  'endpoints',
 ] as const;
 
 export async function hydrate(): Promise<void> {

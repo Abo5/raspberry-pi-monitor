@@ -55,6 +55,9 @@ interface State {
   /** Saved sign-in per Agent. Presence = "don't ask again". */
   credentials: Record<string, { username: string; password: string }>;
 
+  /** Real Agent endpoint per Agent id. Presence = a real Pi (not the demo). */
+  endpoints: Record<string, { ip: string; port: string; token: string }>;
+
   settings: Settings;
 
   // mutations
@@ -114,6 +117,8 @@ export const useStore = create<State>((set, get) => ({
   selectedWidgets: [],
 
   credentials: {},
+
+  endpoints: {},
 
   settings: {
     theme: 'system',

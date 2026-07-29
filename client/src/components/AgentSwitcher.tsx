@@ -6,7 +6,7 @@ import { Modal, Pressable, Text, View } from 'react-native';
 import { useTheme } from '../theme';
 import { useStore } from '../store/useStore';
 import { AgentCard } from './AgentCard';
-import { startTunnel, stopTunnel } from '../sim/tunnel';
+import { connectAgent, disconnectAgent } from '../net/transport';
 
 interface Props {
   visible: boolean;
@@ -24,9 +24,9 @@ export function AgentSwitcher({ visible, onClose, onSeeAll }: Props) {
 
   const switchTo = (agentId: string) => {
     if (agentId !== currentId) {
-      stopTunnel();
+      disconnectAgent();
       setStore({ currentAgentId: agentId, snapshot: null, connection: { kind: 'unknown' } });
-      startTunnel();
+      connectAgent(agentId);
     }
     onClose();
   };

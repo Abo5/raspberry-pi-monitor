@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../theme';
 import { useStore } from '../../store/useStore';
 import { WaveBackground } from '../../components/WaveBackground';
-import { startTunnel, stopTunnel } from '../../sim/tunnel';
+import { connectAgent, disconnectAgent } from '../../net/transport';
 
 const MILESTONES = ['Initiating remote connection…', 'Handshake sent…', 'Securing the channel…', 'Opening channels…'];
 
@@ -28,9 +28,9 @@ export function ConnectScreen() {
     if (started.current) return;
     started.current = true;
     if (agentId !== currentId || connection.kind !== 'connected') {
-      stopTunnel();
+      disconnectAgent();
       setStore({ currentAgentId: agentId, snapshot: null, connection: { kind: 'unknown' } });
-      startTunnel();
+      connectAgent(agentId);
     }
   }, []);
 

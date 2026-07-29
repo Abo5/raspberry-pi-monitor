@@ -21,6 +21,25 @@ export function ScanQR() {
   const [milestone, setMilestone] = useState(-1); // -1 = scanning
   const scanned = useRef(false);
 
+  // A real Agent QR encodes { ip, port, token } — route straight to the real
+  // connect screen with the fields prefilled. Anything else is treated as demo.
+  const onScan = (data: string) => {
+    if (scanned.current) return;
+    try {
+      const parsed = JSON.parse(data);
+      if (parsed && parsed.ip && parsed.port && parsed.token) {
+        scanned.current = true;
+        Haptics.selectionAsync();
+        nav.navigate('AddRealPi', { endpoint: { ip: String(parsed.ip), port: String(parsed.port), token: String(parsed.token) } });
+        setTimeout(() => (scanned.current = false), 800);
+        return;
+      }
+    } catch {
+      // not a real-Pi QR — fall through to the demo handshake
+    }
+    startHandshake();
+  };
+
   const startHandshake = () => {
     if (scanned.current) return;
     scanned.current = true;
@@ -60,7 +79,7 @@ export function ScanQR() {
           <CameraView
             style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
             barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-            onBarcodeScanned={milestone === -1 ? startHandshake : undefined}
+            onBarcodeScanned={milestone === -1 ? (r: { data: string }) => onScan(r.data) : undefined}
           />
         ) : cameraDenied ? (
           <EmptyState
@@ -133,7 +152,7 @@ export function ScanQR() {
       </Text>
 
       <View style={{ borderTopWidth: 1, borderTopColor: c.border.hairline, marginTop: 20, paddingTop: 8 }}>
-        <ActionButton label="Enter the code by hand" variant="tertiary" onPress={startHandshake} />
+        <ActionButton label="Connect to a Pi on my network" variant="secondary" onPress={() => nav.navigate('AddRealPi', {})} />
         <ActionButton label="Use a demo Pi (no hardware)" variant="tertiary" onPress={startHandshake} />
       </View>
     </Screen>

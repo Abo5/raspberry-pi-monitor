@@ -9,7 +9,7 @@ import { Screen } from '../../components/Shared';
 import { AgentCard } from '../../components/AgentCard';
 import { EmptyState } from '../../components/States';
 import { ActionButton } from '../../components/ActionButton';
-import { startTunnel, stopTunnel } from '../../sim/tunnel';
+import { connectAgent, disconnectAgent } from '../../net/transport';
 
 export function AgentList() {
   const nav = useNavigation<any>();
@@ -34,9 +34,9 @@ export function AgentList() {
 
   const switchTo = (agentId: string) => {
     if (agentId !== currentId) {
-      stopTunnel();
+      disconnectAgent();
       setStore({ currentAgentId: agentId, snapshot: null, connection: { kind: 'unknown' } });
-      startTunnel();
+      connectAgent(agentId);
     }
     nav.goBack();
   };
