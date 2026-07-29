@@ -34,6 +34,7 @@ Track A is Phase 1 of Track B — nothing is thrown away.
 
 | # | Document | Purpose |
 |---|---|---|
+| ★ | **[MASTER-PLAN](MASTER-PLAN.md)** | **The complete plan from zero to shipped — start here.** Every phase, task, and done-criteria, with what's already built marked ✅. |
 | 00 | **This index** | Orientation, current status, tracks. |
 | 01 | [BRD](01-BRD.md) | Business Requirements: problem, goals, users, scope, success metrics. |
 | 02 | [SRS](02-SRS.md) | Software Requirements: numbered functional (FR) + non-functional (NFR) requirements, use cases. |
