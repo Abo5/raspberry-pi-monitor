@@ -10,7 +10,8 @@ import { TimeRangeChips } from '../../components/TimeRangeChips';
 import { MetricChart } from '../../components/MetricChart';
 import { ListRow, Card } from '../../components/Shared';
 import { RANGE_MS, SeriesKey, TimeRange } from '../../types';
-import { rollupNote, sampleSeries, SERIES } from '../../sim/metrics';
+import { rollupNote, SERIES } from '../../sim/metrics';
+import { useSeriesHistory } from '../../net/useSeriesHistory';
 import { fmtValue } from '../../lib/format';
 import { alertTitle } from '../../sim/tunnel';
 
@@ -28,12 +29,10 @@ export function MetricDetail() {
   const [range, setRange] = useState<TimeRange>('6h');
 
   const tick = RANGE_MS[range] <= RANGE_MS['1h'] ? snapshot?.receivedAt : 0;
-  const samples = useMemo(() => {
-    const to = Date.now();
-    return sampleSeries(seriesKey, to - RANGE_MS[range], to, 120);
-  }, [seriesKey, range, tick]);
+  const samples = useSeriesHistory(seriesKey, RANGE_MS[range], tick);
 
   const stats = useMemo(() => {
+    if (samples.length === 0) return null;
     const vs = samples.map((s) => s.v).sort((a, b) => a - b);
     const avg = vs.reduce((a, b) => a + b, 0) / vs.length;
     return {
@@ -89,7 +88,7 @@ export function MetricDetail() {
             <View key={k} style={{ alignItems: 'center' }}>
               <Text style={[type.micro, { color: c.text.tertiary }]}>{k.toUpperCase()}</Text>
               <Text style={[type.metricM, { color: c.text.primary, marginTop: 2 }]}>
-                {fmtValue(seriesKey, stats[k]).value}
+                {stats ? fmtValue(seriesKey, stats[k]).value : '—'}
               </Text>
             </View>
           ))}

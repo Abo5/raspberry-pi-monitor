@@ -74,22 +74,24 @@ own iPhone.
 - ✅ Jest + CI-able tests; native build path (`expo run:ios`).
 **Verify:** app runs on the simulator; `npm test` green. **Done.** ✅
 
-### Phase 1 — LAN MVP: real telemetry + shell 🟡 (≈90%)
+### Phase 1 — LAN MVP: real telemetry + shell ✅ (code complete & verified; awaiting your Pi to run on hardware)
 **Goal:** the app shows your Pi's *real* numbers and opens a *real* shell, on the
 same Wi-Fi.
 **Prereq:** P-1 (Pi reachable on the LAN).
 - ✅ Agent sampler (temp, CPU, memory, disk, network, load, uptime) from `/proc`+`/sys`.
 - ✅ Agent local HTTP/WS API: `/health /agent /snapshot /series /actions`, `WS /telemetry`, `WS /shell`, bearer-token auth, prints a pairing QR.
-- ✅ Client real transport (`localTransport`) + real/sim controller.
+- ✅ Client real transport (`localTransport`) + real/sim controller (`transport.ts`).
 - ✅ "Connect to a Pi on my network" (manual ip/port/token or scan the Agent QR) → verify → pair → connect.
-- ✅ Verified over the wire (facts + telemetry stream + shell echo) against the live Agent.
-- ⬜ **Run it on your actual Pi:** cross-compile the Agent for `aarch64` (or `cargo build` on the Pi), start it, and connect from the app.
-- ⬜ **On-device app build** (so the iPhone reaches the Pi over Wi-Fi): `npx expo run:ios --device "<your iPhone>"` (ATS localhost/LAN exception already configured).
-- ⬜ Point the client's live shell UI at the real shell channel (currently the Shell screen uses the simulated responder; swap to `openLocalShell` when the current Agent is real).
-- ⬜ Point charts' history at `/series` (real) when connected to a real Agent.
+- ✅ Shell screen drives the **real** PTY over `WS /shell` when the Agent is real (ANSI-stripped renderer); demo stays simulated.
+- ✅ Chart history reads the **real** `/series` (via `useSeriesHistory`) when connected to a real Agent; demo stays simulated.
+- ✅ Agent build guide + one-line `install.sh` (systemd user service) for **Pi 5 / Raspberry Pi OS 64-bit**.
+- ✅ `app.json` NSAllowsLocalNetworking so the native build reaches the LAN Agent.
+- ✅ Verified end-to-end against the live Agent: facts, telemetry stream, shell echo, and `/series` history all confirmed over the wire.
+- ⬜ **On your hardware:** copy `agent/` to the Pi → `./install.sh` → in the app "Connect to a Pi on my network" with the printed ip/port/token. (Only step left; needs the physical Pi + an on-device app build `npx expo run:ios --device "<iPhone>"` if you want it on a real phone rather than the simulator.)
 **Verify:** open the app → tap your Pi → sign in → see live temperature/CPU that
 change when you load the Pi; open the shell and run `htop`/`vcgencmd measure_temp`.
-**Done when:** real metrics + a working shell from the phone on the LAN.
+**Done when:** real metrics + a working shell from the phone on the LAN. — *All
+code done & verified; run `agent/install.sh` on your Pi 5 to light it up.*
 
 ### Phase 2 — Storage, actions, alerts ⬜
 **Goal:** real history charts, run allow-listed actions, alerts fire on the Pi.

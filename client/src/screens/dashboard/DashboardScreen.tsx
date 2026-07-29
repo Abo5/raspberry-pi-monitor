@@ -16,7 +16,8 @@ import { AlertRow } from '../../components/AlertRow';
 import { Sparkline } from '../../components/Sparkline';
 import { Skeleton } from '../../components/States';
 import { RANGE_MS, SeriesKey, TimeRange } from '../../types';
-import { rollupNote, sampleSeries } from '../../sim/metrics';
+import { rollupNote } from '../../sim/metrics';
+import { useSeriesHistory } from '../../net/useSeriesHistory';
 import { fmtBps, fmtPct, fmtTemp } from '../../lib/format';
 
 const QUICK: { icon: keyof typeof Ionicons.glyphMap; label: string; target: string }[] = [
@@ -50,12 +51,15 @@ export function DashboardScreen() {
 
   // Short ranges re-sample on every Snapshot (live tail); long ranges are stable.
   const tick = RANGE_MS[range] <= RANGE_MS['1h'] ? snapshot?.receivedAt : Math.floor(now / 60_000);
-  const series = useMemo(() => {
-    const to = Date.now();
-    const from = to - RANGE_MS[range];
-    const keys: SeriesKey[] = ['cpu.util_pct', 'cpu.temp_c', 'mem.used_pct', 'net.rx_bps', 'net.tx_bps'];
-    return Object.fromEntries(keys.map((k) => [k, sampleSeries(k, from, to, 60)])) as Record<SeriesKey, ReturnType<typeof sampleSeries>>;
-  }, [range, tick]);
+  // Real history from the Agent when connected to a real Pi; simulated for demo.
+  const rangeMs = RANGE_MS[range];
+  const series: Record<SeriesKey, { t: number; v: number }[]> = {
+    'cpu.util_pct': useSeriesHistory('cpu.util_pct', rangeMs, tick),
+    'cpu.temp_c': useSeriesHistory('cpu.temp_c', rangeMs, tick),
+    'mem.used_pct': useSeriesHistory('mem.used_pct', rangeMs, tick),
+    'net.rx_bps': useSeriesHistory('net.rx_bps', rangeMs, tick),
+    'net.tx_bps': useSeriesHistory('net.tx_bps', rangeMs, tick),
+  } as Record<SeriesKey, { t: number; v: number }[]>;
 
   const v = snapshot?.values;
   const active = alerts.filter((a) => a.resolvedAt == null);
