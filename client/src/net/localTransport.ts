@@ -168,6 +168,87 @@ export function openLocalShell(
   };
 }
 
+function authGet(ep: Endpoint, path: string) {
+  return fetch(`${httpBase(ep)}${path}`, { headers: { Authorization: `Bearer ${ep.token}` } });
+}
+function authJson(ep: Endpoint, method: string, path: string, body: unknown) {
+  return fetch(`${httpBase(ep)}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${ep.token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+/** Allow-listed actions from the Agent config. */
+export async function fetchActions(ep: Endpoint): Promise<any[]> {
+  try {
+    const r = await authGet(ep, '/actions');
+    return r.ok ? await r.json() : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Run one allow-listed action; returns the Agent's result. */
+export async function runActionRemote(ep: Endpoint, id: string): Promise<any | null> {
+  try {
+    const r = await authJson(ep, 'POST', `/actions/${encodeURIComponent(id)}/run`, {});
+    return r.ok ? await r.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchRules(ep: Endpoint): Promise<any[]> {
+  try {
+    const r = await authGet(ep, '/rules');
+    return r.ok ? await r.json() : [];
+  } catch {
+    return [];
+  }
+}
+export async function putRule(ep: Endpoint, rule: unknown): Promise<boolean> {
+  try {
+    const r = await authJson(ep, 'PUT', '/rules', rule);
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+export async function deleteRuleRemote(ep: Endpoint, id: string): Promise<boolean> {
+  try {
+    const r = await fetch(`${httpBase(ep)}/rules/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${ep.token}` },
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchAlerts(ep: Endpoint): Promise<any[]> {
+  try {
+    const r = await authGet(ep, '/alerts');
+    return r.ok ? await r.json() : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Backtest a rule over the given range; returns { count, spans }. */
+export async function backtestRemote(
+  ep: Endpoint,
+  body: { key: string; op: string; threshold: number; dwellS: number; rangeMs: number },
+): Promise<{ count: number; spans: { from: number; to: number }[] } | null> {
+  try {
+    const r = await authJson(ep, 'POST', '/backtest', body);
+    return r.ok ? await r.json() : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Fetch history for one series (charts). */
 export async function fetchSeries(
   ep: Endpoint,

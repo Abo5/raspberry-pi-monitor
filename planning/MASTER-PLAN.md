@@ -37,7 +37,7 @@ Three components: **Client** (iOS/React Native), **Agent** (Rust, on the Pi),
 | Agent — Rust daemon: sampler + local HTTP/WS API + PTY shell + bearer auth | ✅ Phase-1 built, compiles, runs |
 | Client ↔ Agent real transport | ✅ Built + **verified end-to-end** (facts, telemetry stream, shell echo) |
 | Real telemetry on a physical Pi | 🟡 Code ready; not yet run on your Pi (need model/OS + a build to the device) |
-| History storage, real actions, real alerts on the Agent | ⬜ Phase 2 |
+| History storage, real actions, real alerts on the Agent | ✅ Built + **verified end-to-end** (series history, action run, rule fires + peak) |
 | Internet access + end-to-end encryption + Rendezvous | ⬜ Phase 3 |
 | Push notifications + Home/Lock widgets (real) | ⬜ Phase 4 |
 | Remote desktop (real screen streaming) | ⬜ Phase 5 |
@@ -93,15 +93,15 @@ change when you load the Pi; open the shell and run `htop`/`vcgencmd measure_tem
 **Done when:** real metrics + a working shell from the phone on the LAN. — *All
 code done & verified; run `agent/install.sh` on your Pi 5 to light it up.*
 
-### Phase 2 — Storage, actions, alerts ⬜
+### Phase 2 — Storage, actions, alerts ✅
 **Goal:** real history charts, run allow-listed actions, alerts fire on the Pi.
 **Prereq:** Phase 1 running on the Pi.
-- ⬜ Agent: persistent time-series store (SQLite) + retention + downsampling + coverage intervals (see [Data model](08-DATA-MODEL.md)); real `/series`.
-- ⬜ Agent: action runner + a minimal privileged helper; `agent.toml` allow-list (restart a service, apt upgrade, reboot, shutdown) with metadata.
-- ⬜ Agent: rules engine (port the client's dwell/fire/resolve logic) + persisted alert history + backtest query.
-- ⬜ Client: point actions/rules/alerts and chart history at the real endpoints; drop those simulations.
-**Verify:** charts show real multi-hour history; running "Restart Pi-hole" actually restarts it; a temperature rule fires and resolves.
-**Done when:** history, actions, and alerts are all real on the Pi.
+- ✅ Agent: persistent time-series store (SQLite, bundled) + retention prune + bucketed downsampling; real `/series`.
+- ✅ Agent: action runner (`sh -c` on allow-listed commands only, never raw from the network); `agent.toml` allow-list with metadata (destructive / drops-tunnel flags); default reboot action.
+- ✅ Agent: rules engine (dwell/fire/resolve + peak tracking) + persisted alert history + `/backtest` query; unit-tested (4 backtest cases).
+- ✅ Client: actions/rules/alerts and chart history read the real endpoints when the current Agent has a saved endpoint, else the demo simulation.
+**Verify:** ✅ end-to-end against a live Agent (safe echo config) — `/series` returns bucketed history, an action runs (exit 0), a rule fires a real alert with peak, `/backtest` returns spans. Client 65/65 jest + agent 4/4 cargo tests green.
+**Done when:** history, actions, and alerts are all real on the Pi. *(Verified in the lab; final confirmation is running the real reboot/service actions on your Pi 5.)*
 
 ### Phase 3 — Internet + end-to-end encryption ⬜
 **Goal:** reach the Pi from anywhere (cellular), no port-forwarding, fully E2EE.
@@ -189,4 +189,4 @@ cargo check                                       # type-check
 1. ⬜ You: confirm Pi model + OS (unblocks pinning the Agent build & storage).
 2. ⬜ Build/run the Agent on your Pi; connect the app over Wi-Fi (finish Phase 1 on real hardware).
 3. ⬜ Swap the Shell screen + chart history to the real channels when on a real Agent.
-4. ⬜ Start Phase 2 (SQLite store → actions → rules).
+4. ✅ Phase 2 complete (SQLite store → actions → rules → client wiring, verified end-to-end).

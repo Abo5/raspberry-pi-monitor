@@ -10,8 +10,10 @@ import { Screen, Card } from '../../components/Shared';
 import { MetricChart } from '../../components/MetricChart';
 import { ActionButton } from '../../components/ActionButton';
 import { AlertRule, SeriesKey, Severity } from '../../types';
-import { sampleSeries, SERIES } from '../../sim/metrics';
+import { SERIES } from '../../sim/metrics';
 import { backtestSpans } from '../../sim/backtest';
+import { useSeriesHistory } from '../../net/useSeriesHistory';
+import { putRule, deleteRuleRemote } from '../../net/localTransport';
 import { fmtClock, fmtDuration, fmtValue } from '../../lib/format';
 
 const EDITABLE: SeriesKey[] = ['cpu.temp_c', 'cpu.util_pct', 'mem.used_pct', 'disk.used_pct', 'load.1m'];
@@ -20,7 +22,13 @@ export function RuleEditor() {
   const { c, type, radius } = useTheme();
   const nav = useNavigation<any>();
   const route = useRoute<any>();
-  const existing = useStore((s) => s.rules.find((r) => r.id === route.params?.ruleId));
+  const agentId = useStore((s) => s.currentAgentId);
+  const endpoint = useStore((s) => (agentId ? s.endpoints[agentId] : undefined));
+  const real = !!endpoint;
+  // Prefill from a passed rule (real mode) or the store (demo).
+  const paramRule = route.params?.rule as AlertRule | undefined;
+  const storeExisting = useStore((s) => s.rules.find((r) => r.id === route.params?.ruleId));
+  const existing = paramRule ?? storeExisting;
   const upsertRule = useStore((s) => s.upsertRule);
   const deleteRule = useStore((s) => s.deleteRule);
   const connection = useStore((s) => s.connection);
@@ -37,10 +45,8 @@ export function RuleEditor() {
   const thresholdInvalid = Number.isNaN(th);
   const dwellInvalid = Number.isNaN(dw) || dw < 5;
 
-  const samples = useMemo(() => {
-    const to = Date.now();
-    return sampleSeries(seriesKey, to - 24 * 3_600_000, to, 240);
-  }, [seriesKey]);
+  // Real /series (or simulated) history over the last 24h for the backtest.
+  const samples = useSeriesHistory(seriesKey, 24 * 3_600_000);
 
   // Backtest: spans where the predicate held for at least the dwell.
   const backtest = useMemo(() => {
@@ -48,7 +54,7 @@ export function RuleEditor() {
     return { spans: backtestSpans(samples, { op, threshold: th, dwellS: dw }, Date.now()) };
   }, [samples, th, dw, op, thresholdInvalid, dwellInvalid]);
 
-  const save = () => {
+  const save = async () => {
     const rule: AlertRule = {
       id: existing?.id ?? `rule-${Date.now()}`,
       seriesKey,
@@ -59,7 +65,8 @@ export function RuleEditor() {
       enabled: existing?.enabled ?? true,
       notify: existing?.notify ?? true,
     };
-    upsertRule(rule);
+    if (real && endpoint) await putRule(endpoint, rule);
+    else upsertRule(rule);
     nav.goBack();
   };
 
@@ -230,8 +237,9 @@ export function RuleEditor() {
         <ActionButton
           label="Delete rule"
           variant="destructive"
-          onPress={() => {
-            deleteRule(existing.id);
+          onPress={async () => {
+            if (real && endpoint) await deleteRuleRemote(endpoint, existing.id);
+            else deleteRule(existing.id);
             nav.goBack();
           }}
           style={{ marginTop: 10 }}

@@ -1,0 +1,54 @@
+# Raspberry App Agent — example config.
+# Copy to `agent.toml` (or point AGENT_CONFIG at it). Everything is optional;
+# env vars (AGENT_TOKEN/AGENT_BIND/AGENT_INTERVAL_S/AGENT_NAME/AGENT_DB) override.
+
+[agent]
+name = "pi5-livingroom"
+bind_addr = "0.0.0.0:8443"
+sampling_interval_s = 5
+# token = "PIN-IT-HERE"   # else a random token is generated each run
+
+[storage]
+# db_path = "/home/pi/.local/share/raspberry-agent/agent.db"
+raw_retention_days = 90
+
+# The allow-list: the ONLY operations this Pi will run as Actions.
+# The literal `command` is shown in the app; arbitrary commands are the shell's job.
+[[actions]]
+id = "restart-pihole"
+category = "Services"
+name = "Restart Pi-hole"
+command = "systemctl restart pihole-FTL"
+expected_duration_s = 4
+
+[[actions]]
+id = "restart-ha"
+category = "Services"
+name = "Restart Home Assistant"
+command = "systemctl restart home-assistant"
+expected_duration_s = 8
+
+[[actions]]
+id = "apt-upgrade"
+category = "Maintenance"
+name = "Update packages"
+command = "apt-get -y upgrade"
+expected_duration_s = 240
+
+[[actions]]
+id = "reboot"
+category = "Power"
+name = "Reboot"
+command = "sudo systemctl reboot"
+expected_duration_s = 50
+destructive = true
+drops_tunnel = true
+
+[[actions]]
+id = "shutdown"
+category = "Power"
+name = "Shut down"
+command = "sudo systemctl poweroff"
+expected_duration_s = 15
+destructive = true
+drops_tunnel = true

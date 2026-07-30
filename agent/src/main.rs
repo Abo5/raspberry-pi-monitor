@@ -1,10 +1,12 @@
-//! Raspberry App Agent — Phase 1 "LAN MVP".
-//! Samples the Pi's real metrics and serves them (plus an interactive shell)
-//! over a local HTTP/WebSocket API the iOS client connects to. See
-//! planning/11-LOCAL-MVP.md.
+//! Raspberry App Agent.
+//! Samples the Pi's real metrics and serves them (telemetry, history, an
+//! interactive shell, allow-listed actions, and alert rules) over a local
+//! HTTP/WebSocket API the iOS client connects to. See planning/.
 
+mod actions;
 mod config;
 mod metrics;
+mod rules;
 mod server;
 mod shell;
 mod store;
@@ -27,7 +29,8 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let cfg = Arc::new(Config::load());
-    let store = Store::new(4096); // ~5.7h at 5s sampling; Phase 2 = SQLite
+    let store = Store::open(&cfg.db_path, cfg.retention_days)?;
+    tracing::info!("store: {} (retention {} days)", cfg.db_path, cfg.retention_days);
     let (live, _) = broadcast::channel::<String>(64);
 
     let state = AppState { cfg: cfg.clone(), store, live };

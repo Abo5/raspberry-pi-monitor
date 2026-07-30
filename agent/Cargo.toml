@@ -2,7 +2,7 @@
 name = "raspberry-agent"
 version = "0.1.0"
 edition = "2021"
-description = "Raspberry App Agent — telemetry + shell daemon for the Pi (Phase 1 LAN MVP)"
+description = "Raspberry App Agent — telemetry + shell + actions + alerts daemon for the Pi"
 license = "MIT"
 
 [[bin]]
@@ -24,6 +24,8 @@ portable-pty = "0.8"
 qrcode = "0.14"
 rand = "0.8"
 libc = "0.2"
+rusqlite = { version = "0.32", features = ["bundled"] }
+toml = "0.8"
 
 [profile.release]
 opt-level = "z"
