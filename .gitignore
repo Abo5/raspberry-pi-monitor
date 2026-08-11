@@ -1,0 +1,36 @@
+# ---- macOS ----
+.DS_Store
+
+# ---- Client: React Native / Expo (client/) ----
+client/node_modules/
+client/.expo/
+client/dist/
+client/web-build/
+client/*.log
+npm-debug.*
+yarn-error.*
+
+# iOS native build artifacts (keep the project, drop Pods/build)
+client/ios/Pods/
+client/ios/build/
+client/ios/DerivedData/
+client/ios/.xcode.env.local
+client/ios/*.xcworkspace/xcuserdata/
+client/ios/**/xcuserdata/
+
+# Android build artifacts
+client/android/.gradle/
+client/android/build/
+client/android/app/build/
+client/android/local.properties
+
+# ---- Agent: Rust (agent/) ----
+agent/target/
+
+# ---- Relay: Go (relay/) ----
+relay/relay
+relay/*.gz
+
+# ---- misc ----
+*.tgz
+*.gz
