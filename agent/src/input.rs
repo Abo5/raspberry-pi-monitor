@@ -19,6 +19,10 @@ enum Ev {
     Move { dx: i32, dy: i32 },
     #[serde(rename = "click")]
     Click { b: String },
+    #[serde(rename = "down")]
+    Down, // left button press-and-hold (drag start)
+    #[serde(rename = "up")]
+    Up, // left button release (drag end)
     #[serde(rename = "key")]
     Key { k: String },
 }
@@ -28,6 +32,19 @@ fn runtime() -> String {
 }
 fn wl() -> String {
     std::env::var("WAYLAND_DISPLAY").unwrap_or_else(|_| "wayland-0".into())
+}
+fn ydotool_socket() -> String {
+    std::env::var("YDOTOOL_SOCKET").unwrap_or_else(|_| "/run/ydotool.sock".into())
+}
+
+/// ydotool click codes: low bits pick the button (0 left, 1 right), 0x40 = press,
+/// 0x80 = release; 0xC0/0xC1 = a full click.
+async fn ydotool(args: &[&str]) {
+    let _ = Command::new("ydotool")
+        .args(args)
+        .env("YDOTOOL_SOCKET", ydotool_socket())
+        .status()
+        .await;
 }
 
 pub async fn handle_input(mut socket: WebSocket) {
@@ -44,25 +61,43 @@ pub async fn handle_input(mut socket: WebSocket) {
     }
 }
 
+/// Prefer ydotool (uinput) when its daemon socket is present — one device for
+/// move/click/hold, so drag-select works. Otherwise fall back to wlrctl, which
+/// needs no root but can't hold a button (so drag is unavailable).
+fn have_ydotool() -> bool {
+    std::path::Path::new(&ydotool_socket()).exists()
+}
+
+async fn wlrctl(args: &[&str]) {
+    let _ = Command::new("wlrctl")
+        .args(args)
+        .env("XDG_RUNTIME_DIR", runtime())
+        .env("WAYLAND_DISPLAY", wl())
+        .status()
+        .await;
+}
+
 async fn inject(ev: Ev) {
+    let yd = have_ydotool();
     match ev {
         Ev::Move { dx, dy } => {
-            let _ = Command::new("wlrctl")
-                .args(["pointer", "move", &dx.to_string(), &dy.to_string()])
-                .env("XDG_RUNTIME_DIR", runtime())
-                .env("WAYLAND_DISPLAY", wl())
-                .status()
-                .await;
+            if yd {
+                ydotool(&["mousemove", "-x", &dx.to_string(), "-y", &dy.to_string()]).await;
+            } else {
+                wlrctl(&["pointer", "move", &dx.to_string(), &dy.to_string()]).await;
+            }
         }
         Ev::Click { b } => {
-            let button = if b == "right" { "right" } else { "left" };
-            let _ = Command::new("wlrctl")
-                .args(["pointer", "click", button])
-                .env("XDG_RUNTIME_DIR", runtime())
-                .env("WAYLAND_DISPLAY", wl())
-                .status()
-                .await;
+            let right = b == "right";
+            if yd {
+                ydotool(&["click", if right { "0xC1" } else { "0xC0" }]).await;
+            } else {
+                wlrctl(&["pointer", "click", if right { "right" } else { "left" }]).await;
+            }
         }
+        Ev::Down if yd => ydotool(&["click", "0x40"]).await, // left press (drag start)
+        Ev::Up if yd => ydotool(&["click", "0x80"]).await,   // left release (drag end)
+        Ev::Down | Ev::Up => {} // no button-hold without ydotool
         Ev::Key { k } => inject_key(&k).await,
     }
 }

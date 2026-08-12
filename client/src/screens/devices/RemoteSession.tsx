@@ -107,6 +107,8 @@ onerror="setTimeout(function(){document.getElementById('s').src='${url}&t='+Date
   const pending = useRef({ x: 0, y: 0 });  // accumulated, not-yet-sent delta
   const lastSent = useRef(0);
   const SENS = 2.5; // touchpad sensitivity
+  const dragging = useRef(false);      // left button held (drag-select in progress)
+  const dragCandidate = useRef(false); // this touch began right after a tap
 
   const flushMove = (force?: boolean) => {
     const now = Date.now();
@@ -130,6 +132,10 @@ onerror="setTimeout(function(){document.getElementById('s').src='${url}&t='+Date
         pinchBase.current = 0;
         lastMove.current = { x: 0, y: 0 };
         pending.current = { x: 0, y: 0 };
+        dragging.current = false;
+        // A touch that starts right after a tap becomes a drag as soon as it moves
+        // (tap-then-drag = drag-select, like a laptop touchpad).
+        dragCandidate.current = Date.now() - lastTap.current < 320;
       },
       onPanResponderMove: (e, g) => {
         const ts = e.nativeEvent.touches;
@@ -139,7 +145,13 @@ onerror="setTimeout(function(){document.getElementById('s').src='${url}&t='+Date
           applyZoom(clamp((scaleBase.current * d) / pinchBase.current, 1, 4));
           moved.current = true;
         } else {
-          // Send only the DELTA since the last move (wlrctl is relative), throttled.
+          if (dragCandidate.current && !dragging.current && Math.abs(g.dx) + Math.abs(g.dy) > 6) {
+            dragging.current = true;
+            lastTap.current = 0; // cancel the pending single-click
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            sendInput({ t: 'down' }); // hold the left button → moves now drag-select
+          }
+          // Send only the DELTA since the last move (relative), throttled.
           const ddx = g.dx - lastMove.current.x;
           const ddy = g.dy - lastMove.current.y;
           lastMove.current = { x: g.dx, y: g.dy };
@@ -156,6 +168,11 @@ onerror="setTimeout(function(){document.getElementById('s').src='${url}&t='+Date
       onPanResponderRelease: () => {
         pinchBase.current = 0;
         flushMove(true);
+        if (dragging.current) {
+          dragging.current = false;
+          sendInput({ t: 'up' }); // release the drag-select
+          return;
+        }
         if (!moved.current && Date.now() - startT.current < 260) {
           const now = Date.now();
           if (now - lastTap.current < 300) {
