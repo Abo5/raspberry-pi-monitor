@@ -28,9 +28,10 @@ pub async fn handle_screen(mut socket: WebSocket) {
                 tokio::time::sleep(Duration::from_millis(600)).await;
             }
         }
-        // Small floor between frames; also lets a client close break promptly.
+        // Tiny floor between frames (grim capture + encode already pace us to a
+        // sane rate); mostly here to notice a client close promptly.
         tokio::select! {
-            _ = tokio::time::sleep(Duration::from_millis(80)) => {}
+            _ = tokio::time::sleep(Duration::from_millis(8)) => {}
             incoming = socket.recv() => match incoming {
                 Some(Ok(Message::Close(_))) | None => break,
                 _ => {}

@@ -86,7 +86,10 @@ export function RemoteSession() {
       ws.onmessage = (e) => {
         if (typeof e.data === 'string') return;
         const now = Date.now();
-        if (now - lastFrameAt.current < 120) return; // drop excess frames (memory safety)
+        // Process a sustainable rate on the JS side (Full HD JPEG decode is heavy);
+        // extra frames from the agent are dropped cheaply before any work. The
+        // frames we DO show are always the freshest → low latency, low memory.
+        if (now - lastFrameAt.current < 140) return;
         lastFrameAt.current = now;
         setFrame(`data:image/jpeg;base64,${abToB64(e.data as ArrayBuffer)}`);
       };
