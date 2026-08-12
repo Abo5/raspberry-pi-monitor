@@ -17,6 +17,32 @@ const S = () => useStore.getState();
 let telemetryWs: WebSocket | null = null;
 let rttTimer: ReturnType<typeof setInterval> | null = null;
 
+// Auto-reconnect state: while the user wants this Pi connected, we keep retrying
+// (agent restart, brief Wi-Fi drop) with backoff — the app recovers on its own.
+let activeEp: Endpoint | null = null;
+let wantConnected = false;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let backoff = 2000;
+
+function closeSocket() {
+  stopRttPing();
+  if (telemetryWs) {
+    telemetryWs.onclose = null;
+    telemetryWs.onerror = null;
+    try { telemetryWs.close(); } catch { /* noop */ }
+    telemetryWs = null;
+  }
+}
+
+function scheduleReconnect() {
+  if (!wantConnected || !activeEp || reconnectTimer) return;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    if (wantConnected && activeEp) connectLocal(activeEp, true);
+  }, backoff);
+  backoff = Math.min(Math.round(backoff * 1.6), 15000);
+}
+
 function httpBase(ep: Endpoint) {
   return `http://${ep.ip}:${ep.port}`;
 }
@@ -24,36 +50,55 @@ function wsBase(ep: Endpoint) {
   return `ws://${ep.ip}:${ep.port}`;
 }
 
-/** Fetch the Agent's identity facts (also validates the token). */
-export async function fetchAgentFacts(ep: Endpoint): Promise<{
-  name: string;
-  hostname: string;
-  model: string;
-  os: string;
-  agent_version: string;
-} | null> {
+/** Fetch the Agent's identity facts (also validates the token). Fails fast on an
+ * unreachable Pi (7s timeout) so the UI never hangs. Returns 'unauthorized' when
+ * the Pi answered but rejected the token, so the user gets the right message. */
+export type FactsResult =
+  | { name: string; hostname: string; model: string; os: string; agent_version: string }
+  | 'unauthorized'
+  | null;
+
+export async function fetchAgentFacts(ep: Endpoint): Promise<FactsResult> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 7000);
   try {
     const res = await fetch(`${httpBase(ep)}/agent`, {
       headers: { Authorization: `Bearer ${ep.token}` },
+      signal: ctrl.signal,
     });
+    if (res.status === 401 || res.status === 403) return 'unauthorized';
     if (!res.ok) return null;
     return await res.json();
   } catch {
-    return null;
+    return null; // timeout / network unreachable
+  } finally {
+    clearTimeout(t);
   }
 }
 
-/** Open a live connection: milestones → telemetry stream → store snapshots. */
-export async function connectLocal(ep: Endpoint): Promise<void> {
-  disconnectLocal();
+/** Open a live connection: milestones → telemetry stream → store snapshots.
+ * `isReconnect` retries keep `wantConnected` intact so the loop survives. */
+export async function connectLocal(ep: Endpoint, isReconnect = false): Promise<void> {
+  closeSocket();
+  wantConnected = true;
+  activeEp = ep;
+  if (!isReconnect) backoff = 2000;
   S().set({ connection: { kind: 'connecting', milestone: 0 } });
-  S().addEvent('INFO', `transport up (${ep.ip}:${ep.port})`);
+  if (!isReconnect) S().addEvent('INFO', `transport up (${ep.ip}:${ep.port})`);
 
   const t0 = Date.now();
   const facts = await fetchAgentFacts(ep);
+  if (facts === 'unauthorized') {
+    // A rejected key won't fix itself — stop retrying and tell the user.
+    wantConnected = false;
+    S().set({ connection: { kind: 'offline', lastSeen: Date.now() } });
+    S().addEvent('ERROR', 'the Pi rejected the key');
+    return;
+  }
   if (!facts) {
     S().set({ connection: { kind: 'offline', lastSeen: Date.now() } });
-    S().addEvent('ERROR', 'could not reach the Agent (check ip/port/token)');
+    S().addEvent('ERROR', 'could not reach the Pi');
+    scheduleReconnect(); // keep trying — the Pi may just be rebooting
     return;
   }
   S().set({ connection: { kind: 'connecting', milestone: 2 } });
@@ -62,13 +107,28 @@ export async function connectLocal(ep: Endpoint): Promise<void> {
   const ws = new WebSocket(`${wsBase(ep)}/telemetry?token=${encodeURIComponent(ep.token)}`);
   telemetryWs = ws;
 
+  // If the telemetry socket never opens (e.g. the Pi drops off between the facts
+  // fetch and the upgrade), fail to 'offline' instead of hanging on 'connecting'.
+  let opened = false;
+  const openTimer = setTimeout(() => {
+    if (!opened && S().connection.kind !== 'connected') {
+      try { ws.close(); } catch { /* noop */ }
+      if (telemetryWs === ws) telemetryWs = null;
+      S().set({ connection: { kind: 'offline', lastSeen: Date.now() } });
+      S().addEvent('ERROR', 'could not open the live channel');
+    }
+  }, 7000);
+
   ws.onopen = () => {
+    opened = true;
+    clearTimeout(openTimer);
+    backoff = 2000; // recovered — reset backoff
     const rtt = Date.now() - t0;
     S().set({
       connection: { kind: 'connected', path: 'direct', rttMs: rtt, verified: true },
       rttHistory: [...S().rttHistory, { t: Date.now(), v: rtt }].slice(-150),
     });
-    S().addEvent('INFO', 'telemetry channel open');
+    if (!isReconnect) S().addEvent('INFO', 'telemetry channel open');
     startRttPing(ep);
   };
 
@@ -87,23 +147,25 @@ export async function connectLocal(ep: Endpoint): Promise<void> {
     }
   };
 
-  ws.onerror = () => S().addEvent('WARN', 'telemetry socket error');
+  ws.onerror = () => {};
   ws.onclose = () => {
-    if (S().connection.kind === 'connected') {
-      S().set({ connection: { kind: 'offline', lastSeen: Date.now() } });
-      S().addEvent('WARN', 'telemetry socket closed');
-    }
+    clearTimeout(openTimer);
     stopRttPing();
+    if (telemetryWs === ws) telemetryWs = null;
+    if (wantConnected) {
+      // Unexpected drop (agent restart / Wi-Fi blip) → show offline and keep trying.
+      if (S().connection.kind === 'connected') S().addEvent('WARN', 'reconnecting…');
+      S().set({ connection: { kind: 'offline', lastSeen: Date.now() } });
+      scheduleReconnect();
+    }
   };
 }
 
 export function disconnectLocal(): void {
-  stopRttPing();
-  if (telemetryWs) {
-    telemetryWs.onclose = null;
-    telemetryWs.close();
-    telemetryWs = null;
-  }
+  wantConnected = false;
+  activeEp = null;
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  closeSocket();
 }
 
 /** Poll /health to keep an RTT sparkline honest while connected. */

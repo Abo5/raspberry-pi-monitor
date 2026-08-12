@@ -57,8 +57,12 @@ export function AddRealPi() {
     const ep = { ip: ip.trim(), port: port.trim(), token: token.trim() };
     const facts = await fetchAgentFacts(ep);
     setBusy(false);
-    if (!facts) {
-      setError("Couldn't reach the Agent. Check the Pi is running the Agent and the ip/port/token are right, on the same network.");
+    if (!facts || facts === 'unauthorized') {
+      setError(
+        facts === 'unauthorized'
+          ? 'The Pi rejected this key — double-check the token, or re-copy the whole key from the installer.'
+          : "Couldn't reach the Pi. Make sure it's powered on, running the installer, and on the same Wi-Fi.",
+      );
       return;
     }
     const id = `local-${ep.ip}-${ep.port}`;

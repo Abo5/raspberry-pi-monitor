@@ -10,7 +10,6 @@ import { EmptyState } from '../../components/States';
 import { ActionButton } from '../../components/ActionButton';
 import { hexGroups } from '../../lib/fingerprint';
 import { fmtClock } from '../../lib/format';
-import { fetchAgentFacts } from '../../net/localTransport';
 
 function FactRow({ k, v }: { k: string; v: string }) {
   const { c, type } = useTheme();
