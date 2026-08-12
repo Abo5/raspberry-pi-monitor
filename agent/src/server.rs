@@ -48,6 +48,7 @@ pub fn router(state: AppState) -> Router {
         .route("/telemetry", get(ws_telemetry))
         .route("/shell", get(ws_shell))
         .route("/screen", get(ws_screen))
+        .route("/screen.mjpeg", get(mjpeg_screen))
         .route("/input", get(ws_input))
         .layer(middleware::from_fn_with_state(state.clone(), auth))
         .with_state(state)
@@ -201,6 +202,10 @@ async fn ws_shell(State(_s): State<AppState>, ws: WebSocketUpgrade) -> Response 
 
 async fn ws_screen(State(_s): State<AppState>, ws: WebSocketUpgrade) -> Response {
     ws.on_upgrade(crate::screen::handle_screen)
+}
+
+async fn mjpeg_screen(State(_s): State<AppState>) -> Response {
+    crate::screen::mjpeg_response()
 }
 
 async fn ws_input(State(_s): State<AppState>, ws: WebSocketUpgrade) -> Response {

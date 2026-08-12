@@ -7,9 +7,42 @@
 
 use std::time::Duration;
 
+use axum::body::{Body, Bytes};
 use axum::extract::ws::{Message, WebSocket};
+use axum::http::header;
+use axum::response::Response;
 use jpeg_encoder::{ColorType, Encoder};
 use tokio::process::Command;
+
+/// `GET /screen.mjpeg` — a motion-JPEG (`multipart/x-mixed-replace`) HTTP stream.
+/// A WebView `<img>` decodes this natively (no per-frame work on the JS side),
+/// which is far smoother and lighter than shipping frames over a WebSocket.
+pub fn mjpeg_response() -> Response {
+    let stream = futures_util::stream::unfold((), |()| async {
+        let chunk = match capture_jpeg().await {
+            Some(jpeg) => {
+                let mut c = format!(
+                    "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: {}\r\n\r\n",
+                    jpeg.len()
+                )
+                .into_bytes();
+                c.extend_from_slice(&jpeg);
+                c.extend_from_slice(b"\r\n");
+                Bytes::from(c)
+            }
+            None => {
+                tokio::time::sleep(Duration::from_millis(300)).await;
+                Bytes::new()
+            }
+        };
+        Some((Ok::<Bytes, std::io::Error>(chunk), ()))
+    });
+    Response::builder()
+        .header(header::CONTENT_TYPE, "multipart/x-mixed-replace; boundary=frame")
+        .header(header::CACHE_CONTROL, "no-cache, no-store, must-revalidate")
+        .body(Body::from_stream(stream))
+        .expect("valid mjpeg response")
+}
 
 pub async fn handle_screen(mut socket: WebSocket) {
     loop {
