@@ -80,7 +80,10 @@ export function AddRealPi() {
       pairedAt: now,
       verifiedAt: now,
     });
-    setStore({ endpoints: { ...useStore.getState().endpoints, [id]: ep }, currentAgentId: id });
+    setStore({
+      endpoints: { ...useStore.getState().endpoints, [id]: { ...ep, hostname: facts.hostname } },
+      currentAgentId: id,
+    });
     if (wasPaired) {
       // In-app: go straight into the connect → remote-session flow.
       nav.replace('Connect', { agentId: id });

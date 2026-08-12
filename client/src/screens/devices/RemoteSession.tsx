@@ -326,7 +326,7 @@ export function RemoteSession() {
         {...screenPan.panHandlers}
       >
         {frame ? (
-          <Image source={{ uri: frame }} style={{ width: '100%', height: '100%' }} resizeMode="cover" fadeDuration={0} />
+          <Image source={{ uri: frame }} style={{ width: '100%', height: '100%' }} resizeMode="contain" fadeDuration={0} />
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
             <Ionicons name="desktop-outline" size={46} color="#2E2E36" />

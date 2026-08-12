@@ -10,6 +10,7 @@ export interface Endpoint {
   ip: string;
   port: string;
   token: string;
+  hostname?: string; // for an mDNS (.local) fallback if the IP changes
 }
 
 const S = () => useStore.getState();
@@ -31,6 +32,16 @@ function closeSocket() {
     telemetryWs.onerror = null;
     try { telemetryWs.close(); } catch { /* noop */ }
     telemetryWs = null;
+  }
+}
+
+/** After an IP change, rewrite the stored endpoint so every channel uses the
+ * reachable host (matched by token+port, which are stable). */
+function healEndpointIp(ep: Endpoint, newIp: string) {
+  const eps = S().endpoints;
+  const id = Object.keys(eps).find((k) => eps[k].token === ep.token && eps[k].port === ep.port);
+  if (id && eps[id].ip !== newIp) {
+    S().set({ endpoints: { ...eps, [id]: { ...eps[id], ip: newIp } } });
   }
 }
 
@@ -87,7 +98,22 @@ export async function connectLocal(ep: Endpoint, isReconnect = false): Promise<v
   if (!isReconnect) S().addEvent('INFO', `transport up (${ep.ip}:${ep.port})`);
 
   const t0 = Date.now();
-  const facts = await fetchAgentFacts(ep);
+  let facts = await fetchAgentFacts(ep);
+  // If the saved IP is unreachable (e.g. DHCP gave the Pi a new address after a
+  // reboot), fall back to its mDNS name and heal the stored endpoint.
+  if (facts === null && ep.hostname) {
+    const altIp = `${ep.hostname}.local`;
+    if (altIp !== ep.ip) {
+      const alt = await fetchAgentFacts({ ...ep, ip: altIp });
+      if (alt && alt !== 'unauthorized') {
+        facts = alt;
+        ep = { ...ep, ip: altIp };
+        activeEp = ep;
+        healEndpointIp(ep, altIp);
+        S().addEvent('INFO', `IP changed — reached the Pi at ${altIp}`);
+      }
+    }
+  }
   if (facts === 'unauthorized') {
     // A rejected key won't fix itself — stop retrying and tell the user.
     wantConnected = false;

@@ -43,9 +43,10 @@ pub async fn handle_screen(mut socket: WebSocket) {
 async fn capture_jpeg() -> Option<Vec<u8>> {
     let runtime = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/run/user/1000".into());
     let wl = std::env::var("WAYLAND_DISPLAY").unwrap_or_else(|_| "wayland-0".into());
-    // Capture at native resolution (Full HD on this Pi) for a sharp picture.
+    // Capture native resolution (Full HD) WITH the cursor (`-c`), so the user
+    // sees the Pi's real mouse pointer in the stream.
     let out = Command::new("grim")
-        .args(["-t", "ppm", "-"])
+        .args(["-c", "-t", "ppm", "-"])
         .env("XDG_RUNTIME_DIR", runtime)
         .env("WAYLAND_DISPLAY", wl)
         .output()

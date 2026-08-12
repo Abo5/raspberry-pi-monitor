@@ -56,7 +56,7 @@ interface State {
   credentials: Record<string, { username: string; password: string }>;
 
   /** Real Agent endpoint per Agent id. Presence = a real Pi (not the demo). */
-  endpoints: Record<string, { ip: string; port: string; token: string }>;
+  endpoints: Record<string, { ip: string; port: string; token: string; hostname?: string }>;
 
   settings: Settings;
 
