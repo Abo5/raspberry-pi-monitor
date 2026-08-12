@@ -8,7 +8,7 @@
 // until then the gestures are transmitted but have no effect.
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Animated, Easing, Image, PanResponder, Pressable, Text, View, useWindowDimensions,
+  ActivityIndicator, Animated, Easing, Image, PanResponder, Pressable, Text, View, useWindowDimensions,
 } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -63,7 +63,17 @@ export function RemoteSession() {
   const [showCC, setShowCC] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const [frame, setFrame] = useState<string | null>(null);
+  const [stale, setStale] = useState(false); // frames stopped flowing → reconnecting
   const lastFrameAt = useRef(0);
+
+  // Flag the picture as stale if no frame arrives for a moment (Pi rebooting /
+  // Wi-Fi blip) so we can show a tidy "Reconnecting…" pill over the frozen frame.
+  useEffect(() => {
+    const iv = setInterval(() => {
+      setStale(lastFrameAt.current > 0 && Date.now() - lastFrameAt.current > 2500);
+    }, 1000);
+    return () => clearInterval(iv);
+  }, []);
 
   // Turn the phone to landscape while viewing the Pi; restore on exit.
   useFocusEffect(
@@ -336,6 +346,23 @@ export function RemoteSession() {
           </View>
         )}
       </Animated.View>
+
+      {/* Tidy "Reconnecting…" pill over a frozen frame */}
+      {stale && frame && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute', top: insets.top + 10, alignSelf: 'center',
+            flexDirection: 'row', alignItems: 'center', gap: 8,
+            backgroundColor: 'rgba(20,20,26,0.9)', borderRadius: 16,
+            paddingHorizontal: 14, paddingVertical: 8,
+            borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+          }}
+        >
+          <ActivityIndicator size="small" color="#B9A6FF" />
+          <Text style={[type.footnote, { color: '#FFFFFF' }]}>Reconnecting…</Text>
+        </View>
+      )}
 
       {/* Expanded pill — scales + fades in from the dot (native transforms) */}
       {!showKeyboard && (
