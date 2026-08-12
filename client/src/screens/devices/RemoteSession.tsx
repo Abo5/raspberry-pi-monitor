@@ -6,10 +6,11 @@
 // Input is sent to the agent's WS /input; the live picture comes from WS /screen.
 // Real pointer/keys need an input-injection tool on the Pi (installed separately);
 // until then the gestures are transmitted but have no effect.
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, Easing, Image, PanResponder, Pressable, Text, View, useWindowDimensions,
+  ActivityIndicator, Animated, Easing, PanResponder, Pressable, Text, View, useWindowDimensions,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,30 +23,6 @@ import { RemoteKeyboard } from '../../components/RemoteKeyboard';
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const dist = (a: { pageX: number; pageY: number }, b: { pageX: number; pageY: number }) =>
   Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
-
-// Fast base64 for the JPEG frames: build a Latin-1 string in big chunks and hand
-// it to the engine's native btoa. Far lighter on CPU/GC than a per-byte loop —
-// important at Full HD where a naïve encoder can thrash memory and crash.
-function abToB64(buf: ArrayBuffer): string {
-  const bytes = new Uint8Array(buf);
-  let binary = '';
-  const CHUNK = 0x8000;
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK) as unknown as number[]);
-  }
-  // btoa is available in Hermes; the fallback keeps older engines working.
-  const g = globalThis as unknown as { btoa?: (s: string) => string };
-  if (g.btoa) return g.btoa(binary);
-  const T = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  let out = '';
-  for (let i = 0; i < binary.length; i += 3) {
-    const b0 = binary.charCodeAt(i), b1 = binary.charCodeAt(i + 1), b2 = binary.charCodeAt(i + 2);
-    out += T[b0 >> 2] + T[((b0 & 3) << 4) | ((b1 || 0) >> 4)]
-      + (i + 1 < binary.length ? T[((b1 & 15) << 2) | ((b2 || 0) >> 6)] : '=')
-      + (i + 2 < binary.length ? T[b2 & 63] : '=');
-  }
-  return out;
-}
 
 export function RemoteSession() {
   const { c, type } = useTheme();
@@ -62,18 +39,19 @@ export function RemoteSession() {
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [showCC, setShowCC] = useState(false);
   const [expanded, setExpanded] = useState(true);
-  const [frame, setFrame] = useState<string | null>(null);
-  const [stale, setStale] = useState(false); // frames stopped flowing → reconnecting
-  const lastFrameAt = useRef(0);
+  const [loaded, setLoaded] = useState(false); // first MJPEG frame painted
 
-  // Flag the picture as stale if no frame arrives for a moment (Pi rebooting /
-  // Wi-Fi blip) so we can show a tidy "Reconnecting…" pill over the frozen frame.
-  useEffect(() => {
-    const iv = setInterval(() => {
-      setStale(lastFrameAt.current > 0 && Date.now() - lastFrameAt.current > 2500);
-    }, 1000);
-    return () => clearInterval(iv);
-  }, []);
+  // The screen is an MJPEG stream rendered by a WebView <img> — the browser
+  // engine decodes it natively (no per-frame JS), which is smooth and can't
+  // thrash memory. The <img> self-reconnects if the stream drops.
+  const screenHtml = useMemo(() => {
+    if (!ep) return '';
+    const url = `http://${ep.ip}:${ep.port}/screen.mjpeg?token=${encodeURIComponent(ep.token)}`;
+    return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<style>html,body{margin:0;height:100%;background:#0A0A0C;overflow:hidden}.w{height:100vh;display:flex;align-items:center;justify-content:center}img{max-width:100%;max-height:100%;display:block}</style></head>
+<body><div class="w"><img id="s" src="${url}"
+onerror="setTimeout(function(){document.getElementById('s').src='${url}&t='+Date.now()},1500)"></div></body></html>`;
+  }, [ep?.ip, ep?.port, ep?.token]);
 
   // Turn the phone to landscape while viewing the Pi; restore on exit.
   useFocusEffect(
@@ -84,31 +62,6 @@ export function RemoteSession() {
       };
     }, []),
   );
-
-  // ---- Live screen (WS /screen) ----
-  useEffect(() => {
-    if (!ep) return;
-    let alive = true;
-    let ws: WebSocket | null = null;
-    const open = () => {
-      ws = new WebSocket(`ws://${ep.ip}:${ep.port}/screen?token=${ep.token}`);
-      (ws as any).binaryType = 'arraybuffer';
-      ws.onmessage = (e) => {
-        if (typeof e.data === 'string') return;
-        const now = Date.now();
-        // Process a sustainable rate on the JS side (Full HD JPEG decode is heavy);
-        // extra frames from the agent are dropped cheaply before any work. The
-        // frames we DO show are always the freshest → low latency, low memory.
-        if (now - lastFrameAt.current < 140) return;
-        lastFrameAt.current = now;
-        setFrame(`data:image/jpeg;base64,${abToB64(e.data as ArrayBuffer)}`);
-      };
-      ws.onclose = () => { if (alive) setTimeout(open, 1500); };
-      ws.onerror = () => ws?.close();
-    };
-    open();
-    return () => { alive = false; ws?.close(); };
-  }, [ep?.ip, ep?.port, ep?.token]);
 
   // ---- Input channel (WS /input) ----
   const inputWs = useRef<WebSocket | null>(null);
@@ -330,37 +283,39 @@ export function RemoteSession() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0A0A0C' }}>
-      {/* The Pi screen (its own cursor is in the pixels) */}
+      {/* The Pi screen — an MJPEG stream decoded natively by the WebView.
+          Zoom/pan transform on the container; gestures come from the overlay. */}
       <Animated.View
+        pointerEvents="none"
         style={{ flex: 1, transform: [{ translateX: tx }, { translateY: ty }, { scale }] }}
-        {...screenPan.panHandlers}
       >
-        {frame ? (
-          <Image source={{ uri: frame }} style={{ width: '100%', height: '100%' }} resizeMode="contain" fadeDuration={0} />
-        ) : (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-            <Ionicons name="desktop-outline" size={46} color="#2E2E36" />
-            <Text style={[type.callout, { color: '#4A4A54', marginTop: 14, textAlign: 'center' }]}>
-              {connected ? 'Waiting for the Pi’s screen…' : 'Connecting…'}
-            </Text>
-          </View>
-        )}
+        {ep ? (
+          <WebView
+            source={{ html: screenHtml, baseUrl: `http://${ep.ip}:${ep.port}` }}
+            style={{ flex: 1, backgroundColor: '#0A0A0C' }}
+            originWhitelist={['*']}
+            scrollEnabled={false}
+            bounces={false}
+            javaScriptEnabled
+            mixedContentMode="always"
+            onLoadEnd={() => setLoaded(true)}
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            androidLayerType="hardware"
+          />
+        ) : null}
       </Animated.View>
 
-      {/* Tidy "Reconnecting…" pill over a frozen frame */}
-      {stale && frame && (
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute', top: insets.top + 10, alignSelf: 'center',
-            flexDirection: 'row', alignItems: 'center', gap: 8,
-            backgroundColor: 'rgba(20,20,26,0.9)', borderRadius: 16,
-            paddingHorizontal: 14, paddingVertical: 8,
-            borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-          }}
-        >
-          <ActivityIndicator size="small" color="#B9A6FF" />
-          <Text style={[type.footnote, { color: '#FFFFFF' }]}>Reconnecting…</Text>
+      {/* Transparent gesture layer over the screen (below the toolbar) */}
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} {...screenPan.panHandlers} />
+
+      {/* "Connecting…" until the first frame paints */}
+      {!loaded && (
+        <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="small" color="#8E8E93" />
+          <Text style={[type.callout, { color: '#4A4A54', marginTop: 12 }]}>
+            {connected ? 'Loading the screen…' : 'Connecting…'}
+          </Text>
         </View>
       )}
 
