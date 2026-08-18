@@ -1,37 +1,55 @@
-# macOS
+# ---- macOS ----
 .DS_Store
 .AppleDouble
 .LSOverride
 Icon?
 
-# Xcode (for when implementation starts)
+# ---- Xcode / iOS ----
 build/
 DerivedData/
 *.xcuserstate
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
-*.xcodeproj/project.xcworkspace/xcuserdata/
 *.moved-aside
 *.hmap
 *.ipa
 *.dSYM.zip
 *.dSYM
-
-# Swift Package Manager
 .swiftpm/
 .build/
 Packages/
-
-# CocoaPods / Carthage
 Pods/
 Carthage/Build/
+client/ios/Pods/
+client/ios/build/
+client/ios/DerivedData/
+client/ios/.xcode.env.local
 
-# Rust (Agent)
-target/
+# ---- Client: React Native / Expo ----
+client/node_modules/
+client/.expo/
+client/dist/
+client/web-build/
+client/*.log
+npm-debug.*
+yarn-error.*
+
+# Android build artifacts
+client/android/.gradle/
+client/android/build/
+client/android/app/build/
+client/android/local.properties
+
+# ---- Agent: Rust ----
+agent/target/
 **/*.rs.bk
 Cargo.lock
 
-# Secrets — never commit
+# ---- Relay: Go ----
+relay/relay
+relay/*.gz
+
+# ---- Secrets ----
 *.p8
 *.p12
 *.mobileprovision
@@ -43,12 +61,11 @@ secrets/
 *.key
 *.pem
 
-# Editors
+# ---- Editors / misc ----
 .vscode/
 .idea/
 *.swp
 *~
-
-# OS / misc
 Thumbs.db
-node_modules/
+*.tgz
+*.gz

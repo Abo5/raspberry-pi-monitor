@@ -1,65 +1,119 @@
-# raspberry-pi-monitor
+# Raspberry App
 
-**Specification-only repository.** No implementation code — this repo defines *what* to build and *why*, so that implementation can begin cleanly on macOS/Xcode.
+Private, secure remote **monitoring and RDP-style control of a Raspberry Pi from
+an iPhone** — live telemetry, an interactive shell, allow-listed actions, alerts,
+and a real remote-desktop (see the Pi's screen and drive its mouse/keyboard).
+Only your phone and your Pi hold the keys; no cloud account owns your data.
 
-An end-to-end encrypted iOS application for remote control, remote GUI access, shell access, and continuous telemetry of a Raspberry Pi, from anywhere on the internet.
+Styled after Microsoft's "Windows App": pure-black canvas, bloom-wave device
+cards, a floating pill tab bar, and a royal-purple accent.
 
 ---
 
-## 1. Product in one paragraph
+## Repository layout
 
-A Raspberry Pi runs a small always-on daemon (the **Agent**). An iPhone app (the **Client**) pairs with that Agent once, over a QR code, and from then on can reach it from any network on earth. The two endpoints hold the only keys: a zero-knowledge **Rendezvous** service helps them find each other and relays bytes when direct connection is impossible, but it can never read, replay, or forge a single byte of the session. Through that tunnel the user gets a live remote desktop, an interactive terminal, a metrics dashboard, historical charts, alerting, and Home Screen / Lock Screen widgets.
+| Path | What it is | Stack |
+|---|---|---|
+| [`client/`](client) | The iOS app. | React Native (Expo SDK 57) + TypeScript |
+| [`agent/`](agent) | The Pi daemon: samples real metrics, serves them + an interactive shell, runs allow-listed actions, and streams the desktop + injects input. | Rust (axum, tokio) |
+| [`relay/`](relay) | Zero-knowledge connection broker so a phone reaches its Pi from anywhere (multi-tenant, end-to-end encrypted). | Go (gorilla/websocket) |
+| [`planning/`](planning) | Implementation-ready specs: BRD, SRS, TRD, architecture, protocol, data model, security, plan. | — |
+| [`docs/`](docs) | The original deep-design specification (threat model, wire framing, design system). | — |
 
-## 2. Non-negotiable principles
+> **The Pi-side installer** end-users download lives in its own repo:
+> [`Abo5/raspberry-pi-tool`](https://github.com/Abo5/raspberry-pi-tool) — one
+> command on the Pi, prints a connection key, runs as a background service.
 
-| # | Principle |
-|---|---|
-| P1 | **End-to-end encrypted, always.** No server-side plaintext at any point, including push notification payloads and TURN relaying. |
-| P2 | **No inbound ports.** The Agent never listens on a public port. All connections are outbound-initiated from both sides. |
-| P3 | **Explicit trust.** A device is only trusted after an out-of-band pairing with a verifiable key fingerprint. |
-| P4 | **The Pi is the source of truth.** History, config, and policy live on the Pi, not in a cloud account. |
-| P5 | **Degrade, never fail closed on observability.** If the tunnel drops, the Agent keeps recording locally and backfills on reconnect. |
+## What it does
 
-## 3. Document index
+- **Devices** — your paired Pis as bloom-wave cards showing live `ip:port`,
+  temperature and CPU; **tap to enter the remote desktop**, long-press for
+  details (editable ip/port/user/password/key, copy-to-clipboard).
+- **Remote desktop (RDP-style)** — the Pi's real screen streamed live (Full HD),
+  landscape, with a floating AssistiveTouch-style control that docks to any edge:
+  drag = move the Pi's cursor, tap = left-click, double-tap = right-click,
+  pinch = zoom; a full on-screen keyboard (incl. F1–F12) types on the Pi.
+- **Monitor** — CPU, SoC temperature, memory, disk, network with sparklines,
+  gauges and history; metric-detail screens with stats.
+- **Control** — a real interactive shell (PTY), allow-listed actions behind a
+  four-gate destructive-confirmation flow.
+- **Alerts** — rules with a live backtest, an alerts list, and detail.
+- **Settings** — security, appearance, data & retention, diagnostics.
 
-Read in this order.
+## How it works
+
+```
+ iPhone app ── ws(s) ─▶ raspberry-agent (Rust, on the Pi)
+   RN + TS              /snapshot /series /actions /health
+                        WS /telemetry  WS /shell  WS /screen  WS /input
+                        bearer-token auth · app-layer encryption (NaCl secretbox)
+
+ for internet access (optional):
+ iPhone ─▶ relay (Go, on a VPS) ◀─ agent   — routes by a public id; payloads are
+                                             end-to-end encrypted, relay is blind
+```
+
+- **Screen streaming** — the agent captures the Wayland desktop with `grim`
+  (native 1920×1080), encodes JPEG in-process, and pushes frames over `WS /screen`.
+- **Input injection** — `WS /input` drives the Pi's real pointer via `wlrctl`
+  and keyboard via `wtype` (works under labwc/wlroots as the session user).
+- **Encryption** — a connection key derives a symmetric key; messages are sealed
+  with NaCl `secretbox` (XSalsa20-Poly1305), verified byte-for-byte between the
+  Rust agent and the tweetnacl client. The token never travels on the wire.
+
+## Run the app (iOS Simulator)
+
+```sh
+cd client
+npm install
+npx expo run:ios --device "iPhone 16 Pro Max"   # native build (no Expo Go)
+npm test                                         # Jest tests
+```
+
+## Run the Agent (on a Pi)
+
+```sh
+cd agent
+cargo run          # prints a pairing key/QR and serves the API
+# GET /snapshot /series /agent ; WS /telemetry /shell /screen /input  (bearer auth)
+```
+For end users, prefer the one-command installer in
+[`raspberry-pi-tool`](https://github.com/Abo5/raspberry-pi-tool).
+
+## Run the Relay (on a VPS, optional — for internet access)
+
+```sh
+cd relay
+go run . -addr :8787     # zero-knowledge broker; agent + app dial out to it
+```
+
+## Principles
+
+1. **End-to-end encrypted** — no server-side plaintext, ever.
+2. **No inbound ports** on the Pi in the relay path.
+3. **Explicit trust** — pairing with a verified key.
+4. **The Pi is the source of truth** — history and config live on the Pi.
+5. **Degrade, never fake** — gaps and staleness are shown honestly; there is no
+   simulated data anywhere in the app.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+---
+
+## Design specifications (from the spec-first baseline)
 
 | # | Document | Purpose |
 |---|---|---|
-| 00 | [Glossary](docs/00-GLOSSARY.md) | Shared vocabulary. Read first — every other doc assumes it. |
-| 01 | [BRD](docs/01-BRD.md) | Business Requirements: problem, goals, scope, success metrics, stakeholders. |
-| 02 | [SRS](docs/02-SRS.md) | Software Requirements Specification: numbered functional + non-functional requirements, use cases, traceability. |
-| 03 | [Architecture](docs/03-ARCHITECTURE.md) | Components, deployment topology, technology selection, data flow. |
-| 04 | [Security & E2EE Design](docs/04-SECURITY-E2EE.md) | Threat model, key hierarchy, pairing, cryptographic construction. |
-| 05 | [Wire Protocol](docs/05-PROTOCOL.md) | Framing, channel multiplexing, message schemas, error codes. |
-| 06 | [Data Model](docs/06-DATA-MODEL.md) | Agent-side schema, retention, downsampling, client cache. |
-| 07 | [UX Specification](docs/07-UX-SPEC.md) | Screen-by-screen definition, navigation, states, accessibility. |
-| 08 | [Widgets & Live Activities](docs/08-WIDGETS.md) | WidgetKit families, timeline strategy, data path. |
-| 09 | [Test Plan](docs/09-TEST-PLAN.md) | Test strategy, environments, acceptance criteria per requirement. |
-| 10 | [Roadmap](docs/10-ROADMAP.md) | Phased delivery, milestones, definition of done. |
-| 11 | [Agent Deployment](docs/11-AGENT-DEPLOYMENT.md) | Installing, hardening, and operating the Agent on the Pi. |
-| 12 | [Risk Register](docs/12-RISK-REGISTER.md) | Technical, security, and delivery risks with mitigations. |
-| 13 | [Design System](docs/13-DESIGN-SYSTEM.md) | Color tokens, typography, spacing, components, motion, data-viz and accessibility foundations. |
-| 14 | [Open Decisions](docs/14-OPEN-DECISIONS.md) | **Read before writing code.** Cross-cutting questions that must be closed in M0. |
-| — | [ADRs](docs/adr/) | Architecture Decision Records — the reasoning behind each irreversible choice. |
-
-## 4. Target platform baseline
-
-| Side | Baseline |
-|---|---|
-| Client | iOS 17.0+, iPhone. Swift 6, SwiftUI, WidgetKit. Built on macOS with Xcode 16+. |
-| Agent | Raspberry Pi 4 / 5, 64-bit Raspberry Pi OS Bookworm or Trixie, Wayland (labwc/wayfire) session. Rust, single static binary + systemd unit. |
-| Rendezvous | Any small VPS or edge runtime. Stateless. Rust or Go. |
-
-## 5. Status
-
-| Phase | State |
-|---|---|
-| Requirements & design | ✅ This repository |
-| Agent implementation | ⬜ Not started |
-| iOS implementation | ⬜ Not started |
-| Rendezvous implementation | ⬜ Not started |
-
-## 6. License
-
-MIT — see [LICENSE](LICENSE).
+| 00 | [Glossary](docs/00-GLOSSARY.md) | Shared vocabulary. |
+| 01 | [BRD](docs/01-BRD.md) | Business requirements. |
+| 02 | [SRS](docs/02-SRS.md) | Software requirements specification. |
+| 03 | [Architecture](docs/03-ARCHITECTURE.md) | Components & topology. |
+| 04 | [Security & E2EE](docs/04-SECURITY-E2EE.md) | Threat model & crypto. |
+| 05 | [Wire Protocol](docs/05-PROTOCOL.md) | Framing & message schemas. |
+| 06 | [Data Model](docs/06-DATA-MODEL.md) | Agent-side schema. |
+| 07 | [UX Spec](docs/07-UX-SPEC.md) | Screen-by-screen definition. |
+| 08 | [Widgets](docs/08-WIDGETS.md) | WidgetKit design. |
+| 09 | [Test Plan](docs/09-TEST-PLAN.md) | 216 test cases. |
+| 10 | [Roadmap](docs/10-ROADMAP.md) | M0-M6 milestones. |
