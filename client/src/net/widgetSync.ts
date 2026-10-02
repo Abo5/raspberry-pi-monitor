@@ -1,7 +1,12 @@
 // Keeps the Home/Lock Screen widgets in step with the app: on every telemetry
 // snapshot, write the latest metrics + a short sparkline tail + connection state
-// to the shared App Group and ask WidgetKit to reload (coalesced to ≤ 1/15s).
+// to the shared App Group and ask WidgetKit to reload. iOS has no live widgets:
+// a widget redraws only when the app asks (cheap while the app is open) or on
+// its own timeline, so we reload every few seconds while the app runs and once
+// more, unthrottled, the moment the app leaves the screen — the widget then
+// shows the very latest reading and ages it honestly from there.
 // The widget (targets/widget/RaspberryWidget.swift) reads key "telemetry".
+import { AppState } from 'react-native';
 import { ExtensionStorage } from '@bacons/apple-targets';
 import { useStore } from '../store/useStore';
 import type { SeriesKey } from '../types';
@@ -20,7 +25,8 @@ const SERIES_KEYS: SeriesKey[] = [
   'sys.uptime_s',
 ];
 const TAIL = 48;             // enough for the largest sparkline
-const RELOAD_MIN_MS = 15000; // WidgetKit budget: at most one reload per 15 s
+const RELOAD_MIN_MS = 5000; // reloads asked by the app while it's open don't use the widget budget
+const FRESH_MS = 20000; // a reading this recent counts as "connected" on the widget
 
 let storage: ExtensionStorage | null = null;
 function getStorage(): ExtensionStorage | null {
@@ -39,7 +45,7 @@ const tails: Partial<Record<SeriesKey, [number, number][]>> = {};
 let lastPayload = '';
 let lastReload = 0;
 
-function push() {
+function push(force = false) {
   const s = useStore.getState();
   const snap = s.snapshot;
   if (!snap) return; // no telemetry yet — leave the last stored contents alone
@@ -61,14 +67,16 @@ function push() {
   const payload = JSON.stringify({
     agentName: ssh ? ssh.name ?? ssh.host : viaConnect ? viaConnect : agent?.name ?? 'your Pi',
     agentId: ssh ? `ssh:${ssh.host}` : viaConnect ? `connect:${s.monitorDeviceId ?? viaConnect}` : agent?.id ?? '',
-    connection: s.connection.kind,
+    // The live link can blip (reconnecting, paused for a desktop session) while
+    // the numbers are seconds old — judge by the reading's age instead.
+    connection: Date.now() - snap.receivedAt < FRESH_MS ? 'connected' : s.connection.kind,
     rttMs,
     producedAt: snap.producedAt,
     receivedAt: snap.receivedAt,
     values: snap.values,
     series: tails,
   });
-  if (payload === lastPayload) return;
+  if (payload === lastPayload && !force) return;
   lastPayload = payload;
 
   const store = getStorage();
@@ -76,7 +84,7 @@ function push() {
   try {
     store.set('telemetry', payload);
     const now = Date.now();
-    if (now - lastReload >= RELOAD_MIN_MS) {
+    if (force || now - lastReload >= RELOAD_MIN_MS) {
       lastReload = now;
       ExtensionStorage.reloadWidget();
     }
@@ -85,5 +93,9 @@ function push() {
 
 export function startWidgetSync(): void {
   push();
-  useStore.subscribe(push);
+  useStore.subscribe(() => push());
+  // Leaving the app: hand the widget the newest reading right now.
+  AppState.addEventListener('change', (st) => {
+    if (st !== 'active') push(true);
+  });
 }

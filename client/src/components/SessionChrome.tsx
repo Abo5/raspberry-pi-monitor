@@ -6,6 +6,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Animated, Easing, Keyboard, PanResponder, Pressable, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -394,5 +395,140 @@ export function EdgeDock({ actions, icon = 'apps', bottomInset = 0 }: { actions:
         {(!vertical || growUp) && bubbleEl}
       </View>
     </Animated.View>
+  );
+}
+
+export type KeyMod = 'Ctrl' | 'Shift' | 'Alt';
+
+/** The Raspberry Pi keyboard's raspberry key (Super / Windows key). */
+function RaspberryGlyph({ size = 18, color = '#FFFFFF' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M8 3.5c1.6.2 3 .9 4 2 1-1.1 2.4-1.8 4-2-.3 1.6-1.4 2.8-2.8 3.4H10.8C9.4 6.3 8.3 5.1 8 3.5z" fill="#3DDC84" />
+      <Circle cx="12" cy="11" r="2.6" fill={color} />
+      <Circle cx="8" cy="12.6" r="2.4" fill={color} />
+      <Circle cx="16" cy="12.6" r="2.4" fill={color} />
+      <Circle cx="9.6" cy="16.8" r="2.4" fill={color} />
+      <Circle cx="14.4" cy="16.8" r="2.4" fill={color} />
+      <Circle cx="12" cy="20" r="2" fill={color} />
+    </Svg>
+  );
+}
+
+export const KEY_BAR_HEIGHT = 50;
+
+type BarPage = 'keys' | 'fn' | 'nav';
+const NEXT_PAGE: Record<BarPage, { page: BarPage; label: string }> = {
+  keys: { page: 'fn', label: 'Fn' },
+  fn: { page: 'nav', label: 'Nav' },
+  nav: { page: 'keys', label: 'Keys' },
+};
+// Keys that repeat while held, like on a real keyboard.
+const REPEATS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Backspace', 'Delete', 'PageUp', 'PageDown']);
+
+/**
+ * The rest of the keyboard the iPhone doesn't have, on three pages:
+ *  • Keys — Esc, Tab, Ctrl, Shift, Alt, the Raspberry (Super) key, arrows
+ *  • Fn   — F1 … F12
+ *  • Nav  — Home, End, PgUp, PgDn, Insert, Delete, Backspace, Enter, PrtSc, Ctrl+Alt+Del
+ * plus Paste, always at the end. Ctrl/Shift/Alt are one-shot and stay armed
+ * across pages (Ctrl → Fn → F5 = Ctrl+F5). Arrows and delete keys repeat while held.
+ */
+export function SessionKeyBar({
+  bottom, mods, onToggleMod, onKey, onCombo, onPaste,
+}: {
+  bottom: number;
+  mods: KeyMod[];
+  onToggleMod: (m: KeyMod) => void;
+  onKey: (key: string) => void;
+  onCombo: (mods: KeyMod[], key: string) => void;
+  onPaste: () => void;
+}) {
+  const [page, setPage] = useState<BarPage>('keys');
+  const repeat = useRef<{ delay?: ReturnType<typeof setTimeout>; every?: ReturnType<typeof setInterval> }>({});
+  const stopRepeat = () => {
+    if (repeat.current.delay) clearTimeout(repeat.current.delay);
+    if (repeat.current.every) clearInterval(repeat.current.every);
+    repeat.current = {};
+  };
+  useEffect(() => stopRepeat, []);
+
+  const key = (label: React.ReactNode, onPress: () => void, a11y: string, opts: { active?: boolean; holdKey?: string; tint?: string } = {}) => (
+    <Pressable
+      key={a11y}
+      // Repeating keys fire on touch-down, then repeat while held.
+      onPress={opts.holdKey ? undefined : onPress}
+      onPressIn={opts.holdKey ? () => {
+        stopRepeat();
+        const k = opts.holdKey!;
+        onKey(k);
+        repeat.current.delay = setTimeout(() => { repeat.current.every = setInterval(() => onKey(k), 70); }, 400);
+      } : undefined}
+      onPressOut={opts.holdKey ? stopRepeat : undefined}
+      accessibilityRole="button"
+      accessibilityLabel={a11y}
+      accessibilityState={{ selected: !!opts.active }}
+      hitSlop={3}
+      // Equal widths across the row: every key stays on screen, even in portrait.
+      style={({ pressed }) => ({
+        flex: 1, minWidth: 0, height: 36, paddingHorizontal: 1, borderRadius: 8,
+        alignItems: 'center', justifyContent: 'center',
+        backgroundColor: opts.active ? '#8A6BEA' : pressed ? 'rgba(255,255,255,0.28)' : opts.tint ?? 'rgba(255,255,255,0.12)',
+        borderWidth: 1, borderColor: opts.active ? '#B9A6FF' : 'rgba(255,255,255,0.10)',
+      })}
+    >
+      {typeof label === 'string' ? (
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '600' }}>{label}</Text>
+      ) : label}
+    </Pressable>
+  );
+  const plain = (k: string, label: string, a11y = label) => key(label, () => onKey(k), a11y, { holdKey: REPEATS.has(k) ? k : undefined });
+  const icon = (k: string, name: keyof typeof Ionicons.glyphMap, a11y: string) =>
+    key(<Ionicons name={name} size={17} color="#FFFFFF" />, () => onKey(k), a11y, { holdKey: REPEATS.has(k) ? k : undefined });
+  const mod = (m: KeyMod) => key(m, () => onToggleMod(m), m, { active: mods.includes(m) });
+
+  const next = NEXT_PAGE[page];
+  return (
+    <View
+      style={{
+        position: 'absolute', left: 0, right: 0, bottom, height: KEY_BAR_HEIGHT,
+        borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.18)', backgroundColor: 'rgba(20,18,28,0.6)',
+      }}
+    >
+      <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 5, height: KEY_BAR_HEIGHT }}>
+        {key(next.label, () => { stopRepeat(); setPage(next.page); }, `Show ${next.label} keys`, { tint: 'rgba(138,107,234,0.35)' })}
+        {page === 'keys' && (
+          <>
+            {plain('Escape', 'Esc')}
+            {plain('Tab', 'Tab')}
+            {mod('Ctrl')}
+            {mod('Shift')}
+            {mod('Alt')}
+            {key(<RaspberryGlyph />, () => onKey('Super'), 'Raspberry key')}
+            {icon('ArrowLeft', 'chevron-back', 'Left arrow')}
+            {icon('ArrowUp', 'chevron-up', 'Up arrow')}
+            {icon('ArrowDown', 'chevron-down', 'Down arrow')}
+            {icon('ArrowRight', 'chevron-forward', 'Right arrow')}
+          </>
+        )}
+        {page === 'fn' && Array.from({ length: 12 }, (_, i) => plain(`F${i + 1}`, `F${i + 1}`))}
+        {page === 'nav' && (
+          <>
+            {plain('Home', 'Home')}
+            {plain('End', 'End')}
+            {plain('PageUp', 'PgUp', 'Page up')}
+            {plain('PageDown', 'PgDn', 'Page down')}
+            {plain('Insert', 'Ins', 'Insert')}
+            {plain('Delete', 'Del', 'Delete')}
+            {icon('Backspace', 'backspace-outline', 'Backspace')}
+            {icon('Enter', 'return-down-back', 'Enter')}
+            {plain('PrintScreen', 'PrtSc', 'Print screen')}
+            {key('C+A+Del', () => onCombo(['Ctrl', 'Alt'], 'Delete'), 'Control Alt Delete')}
+          </>
+        )}
+        {key(<Ionicons name="clipboard-outline" size={17} color="#FFFFFF" />, onPaste, 'Paste')}
+      </View>
+    </View>
   );
 }

@@ -12,7 +12,9 @@ import { WebView } from 'react-native-webview';
 import { useTheme } from '../../theme';
 import { useStore } from '../../store/useStore';
 import { ConnectWebView } from '../../components/ConnectWebView';
-import { ConnectingOverlay, EdgeDock, useKeyboardHeight } from '../../components/SessionChrome';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
+import { ConnectingOverlay, EdgeDock, KEY_BAR_HEIGHT, KeyMod, SessionKeyBar, useKeyboardHeight } from '../../components/SessionChrome';
 import { signOutOfConnect } from '../../net/connectCookies';
 import { useBiometricGate } from '../../lib/biometric';
 import {
@@ -152,9 +154,41 @@ export function ConnectDevices() {
     return () => clearInterval(t);
   }, [isGui, connecting, closing]);
 
+  // Key bar: one-shot Ctrl/Shift/Alt for the next key or typed character.
+  const [keysPinned, setKeysPinned] = useState(false);
+  const [mods, setMods] = useState<KeyMod[]>([]);
+  const modsRef = useRef<KeyMod[]>([]);
+  const setModsBoth = (m: KeyMod[]) => { modsRef.current = m; setMods(m); };
+  const toggleMod = (m: KeyMod) => {
+    Haptics.selectionAsync().catch(() => {});
+    const cur = modsRef.current;
+    setModsBoth(cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]);
+  };
+  const sendKey = (mods: KeyMod[], key: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    webRef.current?.injectJavaScript(
+      `window.__pimonPress && window.__pimonPress(${JSON.stringify(mods)}, ${JSON.stringify(key)}); true;`,
+    );
+  };
+  const pressKey = (key: string) => {
+    sendKey(modsRef.current, key);
+    if (modsRef.current.length) setModsBoth([]);
+  };
+  const pasteClipboard = async () => {
+    const text = await Clipboard.getStringAsync().catch(() => '');
+    if (!text) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    webRef.current?.injectJavaScript(`window.__pimonPaste && window.__pimonPaste(${JSON.stringify(text)}); true;`);
+  };
+
   // Forward typed text (printable chars) into the session page.
   const forwardText = (text: string) => {
     if (!text) return;
+    // A modifier is armed (e.g. Ctrl): send the character as that combo instead.
+    if (modsRef.current.length) {
+      Array.from(text).forEach((ch) => pressKey(ch));
+      return;
+    }
     webRef.current?.injectJavaScript(`window.__pimonInsertText && window.__pimonInsertText(${JSON.stringify(text)}); true;`);
   };
   // Forward a non-printable key (Backspace, Enter, arrows, …) into the session.
@@ -223,6 +257,9 @@ export function ConnectDevices() {
 
   // Live GUI / SSH session: no app header — the session fills the screen edge to
   // edge (inside the safe area), with small floating controls to leave or switch.
+  // Key bar above the keyboard (or on its own when pinned from the dock).
+  const showKeys = inSession && !connecting && !closing && (kbHeight > 0 || keysPinned);
+
   if (inSession && !unlocked) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
 
   if (inSession) {
@@ -263,14 +300,25 @@ export function ConnectDevices() {
         {!connecting && !closing && (
           <EdgeDock
             icon={params.mode === 'ssh' ? 'terminal' : 'desktop'}
-            bottomInset={kbHeight > 0 ? kbHeight - insets.bottom : 0}
+            bottomInset={(kbHeight > 0 ? kbHeight - insets.bottom : 0) + (showKeys ? KEY_BAR_HEIGHT : 0)}
             actions={[
+              { icon: 'grid-outline', label: keysPinned ? 'Hide keys' : 'Keys', onPress: () => setKeysPinned((v) => !v), tint: keysPinned ? '#B9A6FF' : undefined },
               // One button that follows the keyboard: open it, or hide it while it's up.
               kbHeight > 0
                 ? { icon: 'chevron-down-circle', label: 'Hide keyboard', onPress: hideKeyboard }
                 : { icon: 'keypad', label: 'Keyboard', onPress: openKeyboard },
               { icon: 'close', label: 'Close session', onPress: closeSession, tint: '#FF8A8A' },
             ]}
+          />
+        )}
+        {showKeys && (
+          <SessionKeyBar
+            bottom={kbHeight > 0 ? kbHeight : insets.bottom}
+            mods={mods}
+            onToggleMod={toggleMod}
+            onKey={pressKey}
+            onCombo={sendKey}
+            onPaste={pasteClipboard}
           />
         )}
         {/* Hidden native field that hosts the keyboard; keys are forwarded to the

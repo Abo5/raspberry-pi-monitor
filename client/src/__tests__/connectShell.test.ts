@@ -11,7 +11,8 @@ function loadPage() {
     addEventListener: (t: string, f: (e?: any) => void) => (listeners[t] ??= []).push(f),
     send(s: string) { this.sent.push(s); },
   };
-  class PC { createDataChannel() { return channel; } }
+  const pcState = { closed: false };
+  class PC { createDataChannel() { return channel; } close() { pcState.closed = true; } }
   const win: any = { RTCPeerConnection: PC, ReactNativeWebView: { postMessage: (m: string) => posted.push(JSON.parse(m)) } };
   new Function('window', 'TextDecoder', CONNECT_SHELL_JS)(win, TextDecoder);
   new win.RTCPeerConnection().createDataChannel('shell');
@@ -21,7 +22,7 @@ function loadPage() {
       listeners.message.forEach((f) => f({ data: bytes.slice(i, i + chunk).buffer }));
     }
   };
-  return { win, channel, posted, feed, fire: (t: string) => listeners[t]?.forEach((f) => f()) };
+  return { win, channel, posted, feed, pcState, fire: (t: string) => listeners[t]?.forEach((f) => f()) };
 }
 
 // What a zsh terminal sends back for one typed line: a coloured prompt, the
@@ -47,6 +48,19 @@ describe('Connect remote-shell page hook', () => {
     expect(page.channel.sent).toEqual(['ls\r']);
     page.channel.readyState = 'closed';
     expect(page.win.__pimonShellSend('ls\r')).toBe(false);
+  });
+});
+
+describe('ending the hidden session', () => {
+  it('logs out of the shell, then closes the WebRTC link', () => {
+    jest.useFakeTimers();
+    const page = loadPage();
+    page.win.__pimonShellClose();
+    expect(page.channel.sent).toEqual([' exit\r']);
+    expect(page.pcState.closed).toBe(false);
+    jest.advanceTimersByTime(200);
+    expect(page.pcState.closed).toBe(true);
+    jest.useRealTimers();
   });
 });
 

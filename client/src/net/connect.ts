@@ -443,6 +443,100 @@ export const SESSION_CHROME_JS = `
   window.__pimonHideKeyboard = function () {
     try { var a = document.activeElement; if (a && a.blur) a.blur(); } catch (e) {}
   };
+
+  // 6) Exact keys for the app's key bar (Tab, F1…F12, arrows, Ctrl/Shift/Alt,
+  // the Raspberry/Super key) and paste. Desktop: straight into Connect's VNC
+  // client (rfb.sendKey with X11 keysyms, modifiers held around the key).
+  // Shell: the bytes a terminal sends for that key into Connect's shell channel.
+  function controller(name) {
+    try {
+      var el = document.querySelector('[data-controller~="' + name + '"]');
+      return el && window.Stimulus ? window.Stimulus.getControllerForElementAndIdentifier(el, name) : null;
+    } catch (e) { return null; }
+  }
+  var KS = { Tab: 0xff09, Escape: 0xff1b, Enter: 0xff0d, Backspace: 0xff08, Delete: 0xffff,
+    ArrowLeft: 0xff51, ArrowUp: 0xff52, ArrowRight: 0xff53, ArrowDown: 0xff54, Home: 0xff50, End: 0xff57,
+    PageUp: 0xff55, PageDown: 0xff56, Insert: 0xff63, PrintScreen: 0xff61, Super: 0xffeb };
+  var MOD = { Ctrl: [0xffe3, 'ControlLeft'], Shift: [0xffe1, 'ShiftLeft'], Alt: [0xffe9, 'AltLeft'], Super: [0xffeb, 'MetaLeft'] };
+  function keysym(k) {
+    if (KS[k] !== undefined) return KS[k];
+    var f = /^F([1-9]|1[0-2])$/.exec(k);
+    if (f) return 0xffbe + Number(f[1]) - 1;
+    if (k.length >= 1) { var cp = k.codePointAt(0); return cp < 256 ? cp : 0x01000000 + cp; }
+    return null;
+  }
+  function keyCode(k) { return k === 'Super' ? 'MetaLeft' : (KS[k] !== undefined || /^F\\d+$/.test(k)) ? k : null; }
+  var SEQ = { Tab: '\\t', Escape: '\\x1b', Enter: '\\r', Backspace: '\\x7f', Delete: '\\x1b[3~',
+    ArrowUp: '\\x1b[A', ArrowDown: '\\x1b[B', ArrowRight: '\\x1b[C', ArrowLeft: '\\x1b[D', Home: '\\x1b[H', End: '\\x1b[F',
+    PageUp: '\\x1b[5~', PageDown: '\\x1b[6~', Insert: '\\x1b[2~',
+    F1: '\\x1bOP', F2: '\\x1bOQ', F3: '\\x1bOR', F4: '\\x1bOS', F5: '\\x1b[15~', F6: '\\x1b[17~', F7: '\\x1b[18~',
+    F8: '\\x1b[19~', F9: '\\x1b[20~', F10: '\\x1b[21~', F11: '\\x1b[23~', F12: '\\x1b[24~' };
+  // Keys that take xterm's modifier parameter: [number, final].
+  var XMOD = { ArrowUp: [1, 'A'], ArrowDown: [1, 'B'], ArrowRight: [1, 'C'], ArrowLeft: [1, 'D'], Home: [1, 'H'], End: [1, 'F'],
+    F1: [1, 'P'], F2: [1, 'Q'], F3: [1, 'R'], F4: [1, 'S'], F5: [15, '~'], F6: [17, '~'], F7: [18, '~'], F8: [19, '~'],
+    F9: [20, '~'], F10: [21, '~'], F11: [23, '~'], F12: [24, '~'], Insert: [2, '~'], Delete: [3, '~'], PageUp: [5, '~'], PageDown: [6, '~'] };
+  function shellSocket() {
+    var c = controller('shell');
+    var sock = c && c.connection && c.connection.socket;
+    return sock && sock.readyState === 'open' ? sock : null;
+  }
+  // Press one key (a name like "F5"/"Tab"/"Super" or a single character) with
+  // the given modifiers held. Returns false if no session is ready.
+  window.__pimonPress = function (mods, key) {
+    mods = mods || [];
+    var v = controller('vnc');
+    if (v && v.rfb) {
+      mods.forEach(function (m) { v.rfb.sendKey(MOD[m][0], MOD[m][1], true); });
+      var ks = keysym(key);
+      if (ks !== null) v.rfb.sendKey(ks, keyCode(key));
+      mods.slice().reverse().forEach(function (m) { v.rfb.sendKey(MOD[m][0], MOD[m][1], false); });
+      return true;
+    }
+    var sock = shellSocket();
+    if (!sock) return false;
+    var has = function (m) { return mods.indexOf(m) >= 0; };
+    var s;
+    if (key.length === 1) {
+      s = has('Shift') ? key.toUpperCase() : key;
+      if (has('Ctrl')) {
+        var u = s.toUpperCase().charCodeAt(0);
+        if (u >= 64 && u <= 95) s = String.fromCharCode(u - 64);
+        else if (s === ' ') s = '\\x00';
+      }
+    } else if (key === 'Tab' && has('Shift')) {
+      s = '\\x1b[Z';
+    } else if (mods.length && XMOD[key]) {
+      // xterm modifier encoding: param = 1 + Shift(1) + Alt(2) + Ctrl(4),
+      // e.g. Ctrl+F5 = ESC[15;5~, Ctrl+Left = ESC[1;5D (jump a word).
+      var m = 1 + (has('Shift') ? 1 : 0) + (has('Alt') ? 2 : 0) + (has('Ctrl') ? 4 : 0);
+      var x = XMOD[key];
+      sock.send(x[1] === '~' ? '\\x1b[' + x[0] + ';' + m + '~' : '\\x1b[1;' + m + x[1]);
+      return true;
+    } else {
+      s = SEQ[key] || '';
+    }
+    if (!s) return true;
+    if (has('Alt')) s = '\\x1b' + s;
+    sock.send(s);
+    return true;
+  };
+  // Paste text: typed key by key on the desktop, sent as-is to the shell.
+  window.__pimonPaste = function (text) {
+    var v = controller('vnc');
+    if (v && v.rfb) {
+      Array.from(String(text)).forEach(function (ch) {
+        if (ch === '\\r') return;
+        if (ch === '\\n') v.rfb.sendKey(KS.Enter, 'Enter');
+        else if (ch === '\\t') v.rfb.sendKey(KS.Tab, 'Tab');
+        else v.rfb.sendKey(keysym(ch), null);
+      });
+      return true;
+    }
+    var sock = shellSocket();
+    if (!sock) return false;
+    sock.send(String(text).replace(/\\r?\\n/g, '\\r'));
+    return true;
+  };
 })();
 true;
 `;
@@ -482,6 +576,7 @@ export const CONNECT_SHELL_JS = `
     var ch = orig.apply(this, arguments);
     if (label === 'shell') {
       window.__pimonShell = ch;
+      window.__pimonPC = this;
       try { ch.binaryType = 'arraybuffer'; } catch (e) {}
       var dec = new TextDecoder();
       ch.addEventListener('open', function () { post({ type: 'shell-open' }); });
@@ -499,6 +594,13 @@ export const CONNECT_SHELL_JS = `
     if (!ch || ch.readyState !== 'open') return false;
     ch.send(text);
     return true;
+  };
+  // End the session properly (log out of the shell, then close the WebRTC
+  // link) so the Pi frees it at once — a torn-down WebView would leave it
+  // hanging until it times out, delaying the user's own shell / desktop.
+  window.__pimonShellClose = function () {
+    try { window.__pimonShellSend(' exit\\r'); } catch (e) {}
+    setTimeout(function () { try { window.__pimonPC && window.__pimonPC.close(); } catch (e) {} }, 150);
   };
 })();
 true;

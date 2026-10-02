@@ -62,6 +62,10 @@ export function ConnectMonitor() {
 
   // Each mount of the WebView is one shell session; bump to start a new one.
   const [attempt, setAttempt] = useState(0);
+  // When we stop (a desktop/shell opens, app goes to background…), keep the
+  // WebView a moment longer to end the session properly — see __pimonShellClose.
+  const [draining, setDraining] = useState(false);
+  const wasRunning = useRef(false);
   const webRef = useRef<WebView>(null);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -141,8 +145,17 @@ export function ConnectMonitor() {
   useEffect(() => {
     if (!running) {
       stopPolling();
+      if (wasRunning.current) {
+        wasRunning.current = false;
+        setDraining(true);
+        webRef.current?.injectJavaScript('window.__pimonShellClose && window.__pimonShellClose(); true;');
+        const t = setTimeout(() => setDraining(false), 600);
+        return () => clearTimeout(t);
+      }
       return;
     }
+    wasRunning.current = true;
+    setDraining(false);
     live.current = true;
     gotReading.current = false;
     set({ connection: { kind: 'connecting', milestone: 0 } });
@@ -153,7 +166,7 @@ export function ConnectMonitor() {
     return stopPolling;
   }, [running, deviceId, attempt]);
 
-  if (!running || !device) return null;
+  if ((!running && !draining) || !device) return null;
 
   const url = `${device.url.replace(/\/$/, '')}${DEVICE_SSH_SUFFIX}`;
   return (
