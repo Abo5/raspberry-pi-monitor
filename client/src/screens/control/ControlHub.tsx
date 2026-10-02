@@ -2,7 +2,6 @@
 // before the user commits. Shell/Desktop require biometric re-auth (§17.2).
 import React from 'react';
 import { Text, View } from 'react-native';
-import * as LocalAuthentication from 'expo-local-authentication';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../theme';
 import { useStore } from '../../store/useStore';
@@ -24,19 +23,16 @@ export function ControlHub() {
   const confirmCount = actions.filter((a) => a.destructive).length;
 
   const gate = async (screen: string) => {
-    if (requireBio && (await LocalAuthentication.hasHardwareAsync())) {
-      const res = await LocalAuthentication.authenticateAsync({
-        promptMessage: `Open ${screen === 'Shell' ? 'a shell' : 'the desktop'} on ${agent?.name}`,
-      });
-      if (!res.success) return;
-    }
+    // Face ID (if on) is asked by the Shell / Desktop screen itself.
     nav.navigate(screen);
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: c.surface.canvas }}>
-      <ConnectionBanner onPress={() => nav.navigate('Diagnostics')} />
-      <Screen>
+      <Screen title="Control">
+        <View style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 14 }}>
+          <ConnectionBanner onPress={() => nav.navigate('Diagnostics')} />
+        </View>
         <View style={{ gap: 12 }}>
           <Card>
             <ListRow
@@ -78,9 +74,11 @@ export function ControlHub() {
             />
           </Card>
         </View>
-        <Text style={[type.footnote, { color: c.text.tertiary, marginTop: 20, textAlign: 'center' }]}>
-          Both Remote Desktop and Remote Shell ask for Face ID before they open.
-        </Text>
+        {requireBio && (
+          <Text style={[type.footnote, { color: c.text.tertiary, marginTop: 20, textAlign: 'center' }]}>
+            Both Remote Desktop and Remote Shell ask for Face ID before they open.
+          </Text>
+        )}
       </Screen>
     </View>
   );

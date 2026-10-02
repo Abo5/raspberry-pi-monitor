@@ -14,6 +14,7 @@ import { dark } from '../../theme/colors';
 import { openLocalShell } from '../../net/localTransport';
 import { EmptyState } from '../../components/States';
 
+import { useBiometricGate } from '../../lib/biometric';
 // Strip common ANSI/OSC escape sequences and bare CRs for the simple renderer.
 function stripAnsi(s: string): string {
   return s
@@ -29,7 +30,13 @@ function stripAnsi(s: string): string {
     .replace(/\r/g, '');
 }
 
+// Face ID first when the user turned it on (Settings › Security).
 export function ShellScreen() {
+  const unlocked = useBiometricGate(true, 'Open a shell on your Pi');
+  return unlocked ? <ShellScreenInner /> : <View style={{ flex: 1, backgroundColor: '#000' }} />;
+}
+
+function ShellScreenInner() {
   const { c } = useTheme();
   const term = dark.terminal;
   const agentId = useStore((s) => s.currentAgentId);

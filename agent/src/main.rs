@@ -5,6 +5,7 @@
 
 mod actions;
 mod config;
+mod exec;
 mod input;
 mod screen;
 mod metrics;

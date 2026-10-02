@@ -3,7 +3,7 @@
 // consequence sheet → slide-to-confirm → biometric.
 import React, { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
-import * as LocalAuthentication from 'expo-local-authentication';
+import { confirmWithBiometrics } from '../../lib/biometric';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { useTheme } from '../../theme';
 import { useStore } from '../../store/useStore';
@@ -61,12 +61,7 @@ export function ActionsScreen() {
     setConfirming(null);
     if (!action) return;
     // Biometric after the gesture, immediately before the request goes out (§17.1 gate 4).
-    if (await LocalAuthentication.hasHardwareAsync()) {
-      const res = await LocalAuthentication.authenticateAsync({
-        promptMessage: `Confirm: ${action.name} on ${agent?.name}`,
-      });
-      if (!res.success) return;
-    }
+    if (!(await confirmWithBiometrics(`Confirm: ${action.name} on ${agent?.name}`))) return;
     await execute(action);
   };
 
@@ -122,7 +117,7 @@ export function ActionsScreen() {
         })}
         {!connected && (
           <Text style={[type.footnote, { color: c.text.tertiary, marginTop: 12 }]}>
-            {agent?.name} is offline
+            {agent?.name ?? 'Your Pi'} is offline
           </Text>
         )}
       </Screen>

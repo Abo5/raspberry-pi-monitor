@@ -1,7 +1,7 @@
 // Remote desktop (RDP-style). You control the Pi's OWN cursor — the app draws no
 // cursor of its own. Finger drag → moves the Pi's pointer; one tap → left click;
 // double tap → right click (the Pi shows its own menu); two-finger pinch → zoom,
-// centred on the Pi pointer. The toolbar collapses to a draggable dot after 1.5s.
+// centred on the Pi pointer. The toolbar collapses to a draggable dot after a few idle seconds.
 //
 // Input is sent to the agent's WS /input; the live picture comes from WS /screen.
 // Real pointer/keys need an input-injection tool on the Pi (installed separately);
@@ -11,20 +11,26 @@ import {
   ActivityIndicator, Animated, Easing, PanResponder, Pressable, Text, View, useWindowDimensions,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import * as ScreenOrientation from 'expo-screen-orientation';
 import { useTheme } from '../../theme';
 import { useStore } from '../../store/useStore';
 import { RemoteKeyboard } from '../../components/RemoteKeyboard';
 
+import { useBiometricGate } from '../../lib/biometric';
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const dist = (a: { pageX: number; pageY: number }, b: { pageX: number; pageY: number }) =>
   Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
 
+// Face ID first when the user turned it on (Settings › Security).
 export function RemoteSession() {
+  const unlocked = useBiometricGate(true, 'Open the desktop of your Pi');
+  return unlocked ? <RemoteSessionInner /> : <View style={{ flex: 1, backgroundColor: '#000' }} />;
+}
+
+function RemoteSessionInner() {
   const { c, type } = useTheme();
   const nav = useNavigation<any>();
   const route = useRoute<any>();
@@ -40,6 +46,15 @@ export function RemoteSession() {
   const [showCC, setShowCC] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const [loaded, setLoaded] = useState(false); // first MJPEG frame painted
+  // Leaving: drop the stream first (unmount the WebView), then pop on a clean
+  // frame — otherwise the last remote frame lingers through the exit/rotation.
+  const [closing, setClosing] = useState(false);
+  const close = () => {
+    if (closing) return;
+    setShowKeyboard(false);
+    setClosing(true);
+    setTimeout(() => { if (nav.canGoBack()) nav.goBack(); }, 60);
+  };
 
   // The screen is an MJPEG stream rendered by a WebView <img> — the browser
   // engine decodes it natively (no per-frame JS), which is smooth and can't
@@ -53,15 +68,8 @@ export function RemoteSession() {
 onerror="setTimeout(function(){document.getElementById('s').src='${url}&t='+Date.now()},1500)"></div></body></html>`;
   }, [ep?.ip, ep?.port, ep?.token]);
 
-  // Turn the phone to landscape while viewing the Pi; restore on exit.
-  useFocusEffect(
-    React.useCallback(() => {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(() => {});
-      return () => {
-        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
-      };
-    }, []),
-  );
+  // Landscape while viewing the Pi is handled centrally in navigation.
+
 
   // ---- Input channel (WS /input) ----
   const inputWs = useRef<WebSocket | null>(null);
@@ -200,6 +208,8 @@ onerror="setTimeout(function(){document.getElementById('s').src='${url}&t='+Date
   const DOT = 30;    // small collapsed dot
   const PILLW = 200; // expanded pill width
   const PH = 42;     // expanded pill height
+  const VW = 56;     // vertical pill width (bottom dock)
+  const VH = 176;    // vertical pill height
   const EDGE = 6;    // gap from the screen edge
   const anim = useRef(new Animated.Value(1)).current; // 0 = dot, 1 = pill
   const expandedRef = useRef(true);
@@ -216,14 +226,14 @@ onerror="setTimeout(function(){document.getElementById('s').src='${url}&t='+Date
     Animated.timing(anim, {
       toValue: open ? 1 : 0,
       duration: open ? 240 : 300,
-      easing: open ? Easing.out(Easing.back(1.4)) : Easing.in(Easing.cubic),
+      easing: open ? Easing.out(Easing.back(1.4)) : Easing.in(Easing.back(1.4)),
       useNativeDriver: true,
     }).start();
   };
   const keepOpen = () => {
     if (!expandedRef.current) animateTo(true);
     if (collapseTimer.current) clearTimeout(collapseTimer.current);
-    collapseTimer.current = setTimeout(() => animateTo(false), 2000);
+    collapseTimer.current = setTimeout(() => animateTo(false), 6000);
   };
   useEffect(() => {
     keepOpen();
@@ -287,10 +297,25 @@ onerror="setTimeout(function(){document.getElementById('s').src='${url}&t='+Date
   const pillScale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.25, 1] });
   const pillOpacity = anim.interpolate({ inputRange: [0.12, 1], outputRange: [0, 1] });
   const dotOpacity = anim.interpolate({ inputRange: [0, 0.5], outputRange: [1, 0] });
-  // Dock the pill against whichever edge the dot snapped to.
+  // Dock the pill against whichever edge the dot snapped to. The device's SHORT
+  // edges (charger + camera ends) hold a vertical column; the long sides hold a
+  // horizontal row. Which is which flips with orientation (landscape vs portrait).
+  const vertical = (W > H)
+    ? side === 'left' || side === 'right'
+    : side === 'top' || side === 'bottom';
+  const pillW = vertical ? VW : PILLW;
+  const pillH = vertical ? VH : PH;
   let pillLeft: number;
   let pillTop: number;
-  if (side === 'left' || side === 'right') {
+  if (vertical) {
+    if (side === 'left' || side === 'right') {
+      pillLeft = side === 'left' ? EDGE : W - VW - EDGE;
+      pillTop = clamp(dotPos.current.y - VH / 2, insets.top + EDGE, H - insets.bottom - VH - EDGE);
+    } else {
+      pillTop = side === 'top' ? insets.top + EDGE : H - insets.bottom - VH - EDGE;
+      pillLeft = clamp(dotPos.current.x - VW / 2, EDGE, W - VW - EDGE);
+    }
+  } else if (side === 'left' || side === 'right') {
     pillLeft = side === 'left' ? EDGE : W - PILLW - EDGE;
     pillTop = clamp(dotPos.current.y - PH / 2, insets.top + EDGE, H - insets.bottom - PH - EDGE);
   } else {
@@ -306,7 +331,7 @@ onerror="setTimeout(function(){document.getElementById('s').src='${url}&t='+Date
         pointerEvents="none"
         style={{ flex: 1, transform: [{ translateX: tx }, { translateY: ty }, { scale }] }}
       >
-        {ep ? (
+        {ep && !closing ? (
           <WebView
             source={{ html: screenHtml, baseUrl: `http://${ep.ip}:${ep.port}` }}
             style={{ flex: 1, backgroundColor: '#0A0A0C' }}
@@ -336,47 +361,44 @@ onerror="setTimeout(function(){document.getElementById('s').src='${url}&t='+Date
         </View>
       )}
 
-      {/* Expanded pill — scales + fades in from the dot (native transforms) */}
-      {!showKeyboard && (
-        <Animated.View
-          pointerEvents={expanded ? 'auto' : 'none'}
-          style={{
-            position: 'absolute', top: pillTop, left: pillLeft, width: PILLW, height: PH,
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-            borderRadius: PH / 2, backgroundColor: 'rgba(210,210,216,0.94)',
-            opacity: pillOpacity,
-            transform: [{ scale: pillScale }],
-          }}
-        >
-          <TB icon="search" onPress={zoomStep} />
-          <TB icon="grid" filled onPress={() => { keepOpen(); setShowCC(true); }} />
-          <TB icon="keypad" onPress={() => setShowKeyboard(true)} />
-          <TB icon="close" tint="#C0392B" onPress={() => nav.goBack()} />
-        </Animated.View>
-      )}
-
-      {/* Collapsed dot — draggable; tap to expand. Visible only while collapsed */}
-      {!showKeyboard && (
-        <Animated.View
-          {...dotPan.panHandlers}
-          pointerEvents={expanded ? 'none' : 'auto'}
-          style={{
-            position: 'absolute', top: 0, left: 0, width: DOT, height: DOT, borderRadius: DOT / 2,
-            alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(210,210,216,0.94)',
-            opacity: dotOpacity,
-            transform: [{ translateX: dotTX }, { translateY: dotTY }],
-          }}
-        >
-          <Ionicons name="ellipsis-horizontal" size={18} color="#1A1A1F" />
-        </Animated.View>
-      )}
-
       {/* Keyboard overlay */}
       {showKeyboard && (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: insets.bottom }}>
-          <RemoteKeyboard onKey={sendKey} onClose={() => { setShowKeyboard(false); keepOpen(); }} />
+          <RemoteKeyboard onKey={sendKey} />
         </View>
       )}
+
+      {/* Expanded pill — scales + fades in from the dot (native transforms) */}
+      <Animated.View
+        pointerEvents={expanded ? 'auto' : 'none'}
+        style={{
+          position: 'absolute', top: pillTop, left: pillLeft, width: pillW, height: pillH,
+          flexDirection: vertical ? 'column' : 'row', alignItems: 'center',
+          justifyContent: vertical ? 'space-evenly' : 'center',
+          borderRadius: vertical ? VW / 2 : PH / 2, backgroundColor: 'rgba(210,210,216,0.94)',
+          opacity: pillOpacity,
+          transform: [{ scale: pillScale }],
+        }}
+      >
+        <TB icon="search" onPress={zoomStep} />
+        <TB icon="grid" filled onPress={() => { keepOpen(); setShowCC(true); }} />
+        <TB icon="keypad" onPress={() => { keepOpen(); setShowKeyboard((s) => !s); }} />
+        <TB icon="close" tint="#C0392B" onPress={close} />
+      </Animated.View>
+
+      {/* Collapsed dot — draggable; tap to expand. Visible only while collapsed */}
+      <Animated.View
+        {...dotPan.panHandlers}
+        pointerEvents={expanded ? 'none' : 'auto'}
+        style={{
+          position: 'absolute', top: 0, left: 0, width: DOT, height: DOT, borderRadius: DOT / 2,
+          alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(210,210,216,0.94)',
+          opacity: dotOpacity,
+          transform: [{ translateX: dotTX }, { translateY: dotTY }],
+        }}
+      >
+        <Ionicons name="ellipsis-horizontal" size={18} color="#1A1A1F" />
+      </Animated.View>
 
       {/* Control Center sheet */}
       {showCC && (

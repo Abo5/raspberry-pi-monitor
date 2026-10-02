@@ -9,7 +9,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../theme';
 import { ActionButton } from '../../components/ActionButton';
 
+import { useBiometricGate } from '../../lib/biometric';
+// Face ID first when the user turned it on (Settings › Security).
 export function DesktopScreen() {
+  const unlocked = useBiometricGate(true, 'Open the desktop of your Pi');
+  return unlocked ? <DesktopScreenInner /> : <View style={{ flex: 1, backgroundColor: '#000' }} />;
+}
+
+function DesktopScreenInner() {
   const { c, type, radius } = useTheme();
   const nav = useNavigation<any>();
   const [milestone, setMilestone] = useState(0);

@@ -1,10 +1,13 @@
-// Onboarding — Welcome (§3.2). The three claim rows are the mental model the
-// rest of the app depends on (README P1, P2, P4).
-import React from 'react';
+// Onboarding — Welcome (§3.2), original design. "Set up my Pi" opens the
+// Raspberry Pi Connect sign-in; if the background check found an expired
+// session, the sign-in screen opens by itself once this screen has settled.
+import React, { useEffect, useRef } from 'react';
 import { Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../theme';
+import { useStore } from '../../store/useStore';
+import { connectSignOutReason } from '../../net/connect';
 import { Screen } from '../../components/Shared';
 import { ActionButton } from '../../components/ActionButton';
 
@@ -17,6 +20,27 @@ const CLAIMS: [keyof typeof Ionicons.glyphMap, string][] = [
 export function Welcome() {
   const { c, type } = useTheme();
   const nav = useNavigation<any>();
+  const connectStatus = useStore((s) => s.connectStatus);
+  const autoOpened = useRef(false);
+
+  // No valid Raspberry Pi Connect session → open sign-in once.
+  useEffect(() => {
+    if (connectStatus !== 'signedOut' || autoOpened.current) return;
+    // The user just signed out on purpose: stay here until they tap sign-in.
+    if (connectSignOutReason.manual) {
+      connectSignOutReason.manual = false;
+      autoOpened.current = true;
+      return;
+    }
+    const t = setTimeout(() => {
+      // Re-check at fire time: a quick sign-in/out can change things meanwhile.
+      if (useStore.getState().connectStatus !== 'signedOut' || !nav.isFocused()) return;
+      autoOpened.current = true;
+      nav.navigate('ConnectLogin');
+    }, 400);
+    return () => clearTimeout(t);
+  }, [connectStatus, nav]);
+
   return (
     <Screen style={{ flexGrow: 1, justifyContent: 'center' }}>
       <View style={{ alignItems: 'center', marginBottom: 32 }}>
@@ -38,13 +62,7 @@ export function Welcome() {
         ))}
       </View>
 
-      <ActionButton label="Set up my Pi" onPress={() => nav.navigate('Install')} />
-      <ActionButton
-        label="I already have the Agent running"
-        variant="tertiary"
-        onPress={() => nav.navigate('AddRealPi', {})}
-        style={{ marginTop: 8 }}
-      />
+      <ActionButton label="Set up my Pi" onPress={() => nav.navigate('ConnectLogin')} />
     </Screen>
   );
 }

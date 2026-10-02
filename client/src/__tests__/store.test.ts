@@ -132,3 +132,9 @@ describe('shell scrollback', () => {
     expect(buf[buf.length - 1]).toBe('line 10499');
   });
 });
+
+describe('settings defaults', () => {
+  it('starts with Face ID for shell & desktop off', () => {
+    expect(useStore.getState().settings.requireBioShellDesktop).toBe(false);
+  });
+});

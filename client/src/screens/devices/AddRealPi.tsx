@@ -3,7 +3,7 @@
 // endpoint, then save it and connect. The Agent QR encodes exactly this
 // { ip, port, token }, so scanning fills these in.
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +14,7 @@ import { WaveBackground } from '../../components/WaveBackground';
 import { ActionButton } from '../../components/ActionButton';
 import { fetchAgentFacts } from '../../net/localTransport';
 import { connectAgent } from '../../net/transport';
+import { latinDigits } from '../../lib/latinDigits';
 import { decodeKey } from '../../lib/connectionKey';
 
 export function AddRealPi() {
@@ -85,8 +86,9 @@ export function AddRealPi() {
       currentAgentId: id,
     });
     if (wasPaired) {
-      // In-app: go straight into the connect → remote-session flow.
-      nav.replace('Connect', { agentId: id });
+      // In-app: connect and return to where the user came from (e.g. Monitor).
+      connectAgent(id);
+      nav.goBack();
     } else {
       // First pairing: RootNavigation now switches to the tabs; just connect.
       connectAgent(id);
@@ -123,7 +125,13 @@ export function AddRealPi() {
   return (
     <View style={{ flex: 1, backgroundColor: '#000000' }}>
       <WaveBackground width={width} height={height} variant="cyan" dim />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1 }}
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={{ flex: 1, paddingHorizontal: 24, paddingTop: insets.top + 20 }}>
           <Pressable onPress={() => nav.goBack()} hitSlop={12} style={{ marginBottom: 24 }} accessibilityLabel="Back">
             <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
@@ -140,8 +148,8 @@ export function AddRealPi() {
             or enter the details by hand
           </Text>
 
-          {field('IP address', ip, setIp)}
-          {field('Port', port, setPort, 'numeric')}
+          {field('IP address', ip, (t) => setIp(latinDigits(t)))}
+          {field('Port', port, (t) => setPort(latinDigits(t)), 'numeric')}
           {field('Token', token, setToken)}
 
           {error && (
@@ -161,7 +169,7 @@ export function AddRealPi() {
             disabledReason="Fill in the ip, port, and token."
           />
         </View>
-      </KeyboardAvoidingView>
+      </ScrollView>
     </View>
   );
 }

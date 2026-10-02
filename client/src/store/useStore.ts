@@ -6,6 +6,14 @@ import {
 
 export type RebootPhase = 'sent' | 'acked' | 'offline' | 'back';
 
+export interface ConnectDevice {
+  id: string;
+  name: string;
+  online: boolean;
+  /** Absolute URL of the device's page on connect.raspberrypi.com. */
+  url: string;
+}
+
 export interface RebootWatch {
   actionId: string;
   actionName: string;
@@ -19,12 +27,44 @@ interface Settings {
   theme: 'system' | 'dark' | 'light';
   terminalFontSize: number;
   requireBioShellDesktop: boolean;
+  /** The user has set the Face ID switch themselves (else it starts off). */
+  bioUserSet?: boolean;
   animateCharts: boolean;
   telemetryIntervalS: number;
 }
 
 interface State {
   hydrated: boolean;
+
+  /** Raspberry Pi Connect (cloud) session. Cookies live in the WKWebView store;
+   *  this flag just remembers the user reached the signed-in device list, so the
+   *  "Sign in" button can jump straight there instead of re-opening the pop-up. */
+  connectSignedIn: boolean;
+  /** Signed-in account email, when Connect exposes it. Cosmetic. */
+  connectEmail: string | null;
+  /** Live result of the background session check (not persisted). */
+  connectStatus: 'checking' | 'signedIn' | 'signedOut';
+  /** The account's devices as last read from connect.raspberrypi.com/devices. */
+  connectDevices: ConnectDevice[];
+  /** Bump to make the background session re-check (e.g. after pop-up login). */
+  connectCheckNonce: number;
+  /** A live GUI/SSH session is on screen (pauses the background session check). */
+  connectSessionActive: boolean;
+  /** The saved Connect session has been put back into the WebView cookie store
+   *  (pages opened before this would look signed-out). */
+  connectCookiesReady: boolean;
+  /** Monitor over SSH: where to connect (the password lives in the Keychain). */
+  sshMonitor: SshMonitorTarget | null;
+  /** Connect device the Monitor follows (null → the first online one). */
+  monitorDeviceId: string | null;
+  /** Name of the Pi being monitored through Connect's remote shell, while that
+   *  source is in use (null when Monitor runs over SSH / an agent, or not at all). */
+  connectMonitorName: string | null;
+  /** Last picture of each Pi's desktop (by device URL), taken during a session
+   *  and shown on its card. Memory only — never persisted — so it's gone once
+   *  the app is closed from the app switcher. */
+  deviceSnapshots: Record<string, string>;
+
   paired: boolean;
   agents: Agent[];
   currentAgentId: string | null;
@@ -63,6 +103,8 @@ interface State {
   // mutations
   set: (partial: Partial<State>) => void;
   setSettings: (partial: Partial<Settings>) => void;
+  setConnectAuth: (signedIn: boolean, email?: string | null) => void;
+  signOutConnect: () => void;
   addEvent: (level: LogEvent['level'], message: string) => void;
   pairAgent: (agent: Agent) => void;
   unpairCurrent: () => void;
@@ -78,6 +120,16 @@ interface State {
 
 import { CAPTURE_ENABLED } from '../dev/capture';
 
+export interface SshMonitorTarget {
+  host: string;
+  port: number;
+  username: string;
+  /** The Pi's SSH host key, saved on first connect (trust on first use). */
+  hostKey: string | null;
+  /** The Pi's hostname, read over SSH — shown as the Monitor title. */
+  name: string | null;
+}
+
 const CAPTURE_AGENT = {
   id: 'agent-demo', name: 'pi5-livingroom', hostname: 'pi5-livingroom',
   model: 'Raspberry Pi 5 · 8 GB', os: 'Raspberry Pi OS Trixie (64-bit)',
@@ -86,8 +138,25 @@ const CAPTURE_AGENT = {
   pairedAt: Date.now() - 200_000_000, verifiedAt: Date.now() - 200_000_000,
 };
 
+/** Signed in to Raspberry Pi Connect — or, at launch, signed in last time and
+ *  still being checked. The app opens straight to the saved devices/Monitor on
+ *  that basis (no waiting on the network); a failed check signs out as usual. */
+export const connectLive = (s: Pick<State, 'connectStatus' | 'connectSignedIn'>): boolean =>
+  s.connectStatus === 'signedIn' || (s.connectStatus === 'checking' && s.connectSignedIn);
+
 export const useStore = create<State>((set, get) => ({
   hydrated: CAPTURE_ENABLED,
+  connectSignedIn: false,
+  connectEmail: null,
+  connectStatus: 'checking',
+  connectDevices: [],
+  connectCheckNonce: 0,
+  connectSessionActive: false,
+  connectCookiesReady: false,
+  sshMonitor: null,
+  monitorDeviceId: null,
+  connectMonitorName: null,
+  deviceSnapshots: {},
   paired: CAPTURE_ENABLED,
   agents: CAPTURE_ENABLED ? [CAPTURE_AGENT] : [],
   currentAgentId: CAPTURE_ENABLED ? 'agent-demo' : null,
@@ -123,13 +192,19 @@ export const useStore = create<State>((set, get) => ({
   settings: {
     theme: 'system',
     terminalFontSize: 13,
-    requireBioShellDesktop: true,
+    requireBioShellDesktop: false, // off until the user turns it on
     animateCharts: true,
     telemetryIntervalS: 5,
   },
 
   set: (partial) => set(partial),
   setSettings: (partial) => set({ settings: { ...get().settings, ...partial } }),
+
+  setConnectAuth: (signedIn, email) =>
+    set({ connectSignedIn: signedIn, connectEmail: email !== undefined ? email : get().connectEmail }),
+
+  signOutConnect: () =>
+    set({ connectSignedIn: false, connectEmail: null, connectStatus: 'signedOut', connectDevices: [] }),
 
   addEvent: (level, message) =>
     set({ events: [{ t: Date.now(), level, message }, ...get().events].slice(0, 50) }),

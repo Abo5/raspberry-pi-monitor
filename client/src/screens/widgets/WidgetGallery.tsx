@@ -9,6 +9,7 @@ import { useTheme } from '../../theme';
 import { useStore } from '../../store/useStore';
 import { CATALOG, FAMILY_META, WidgetFamily, WidgetPreview } from '../../widgets/catalog';
 import { WaveBackground } from '../../components/WaveBackground';
+import { GlassBackground } from '../../components/Glass';
 
 const FAMILIES: WidgetFamily[] = ['small', 'medium', 'circular', 'rectangular', 'inline'];
 const LOCK: WidgetFamily[] = ['circular', 'rectangular', 'inline'];
@@ -32,7 +33,8 @@ export function WidgetGallery() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000000', paddingTop: insets.top }}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 140 }}>
+      <GlassBackground base="#000000" strength={0.9} />
+      <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 10, paddingBottom: 140 }}>
         <Text style={[type.display, { color: '#FFFFFF', fontSize: 30 }]}>Widgets</Text>
         <Text style={[type.subhead, { color: '#9A9AA0', marginTop: 4 }]}>
           {selected.length === 0

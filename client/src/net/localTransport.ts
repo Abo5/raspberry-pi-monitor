@@ -287,6 +287,27 @@ export async function runActionRemote(ep: Endpoint, id: string): Promise<any | n
   }
 }
 
+export interface ExecResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  durationMs: number;
+  ok: boolean;
+  timedOut: boolean;
+}
+
+/** Run one arbitrary shell command on the Agent (Live Commands monitor).
+ *  Returns 'old-agent' when the Pi's agent predates the /exec endpoint. */
+export async function execRemote(ep: Endpoint, command: string, timeoutMs = 8000): Promise<ExecResult | 'old-agent' | null> {
+  try {
+    const r = await authJson(ep, 'POST', '/exec', { command, timeoutMs });
+    if (r.status === 404) return 'old-agent';
+    return r.ok ? await r.json() : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchRules(ep: Endpoint): Promise<any[]> {
   try {
     const r = await authGet(ep, '/rules');

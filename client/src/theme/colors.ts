@@ -63,17 +63,19 @@ export interface ColorTokens {
 }
 
 export const dark: ColorTokens = {
+  // Glass: the original palette, with surfaces as translucent frosted layers
+  // over a black canvas + purple glow (same backdrop as the Devices home).
   surface: {
-    canvas: '#0B0F12',
-    raised: '#141A1F',
-    raised2: '#1C242B',
-    sunken: '#06090B',
-    overlay: '#1F2831',
+    canvas: '#000000',
+    raised: 'rgba(255,255,255,0.06)',
+    raised2: 'rgba(255,255,255,0.10)',
+    sunken: '#050507',
+    overlay: '#1F1D2B',
     scrim: 'rgba(0,0,0,0.62)',
   },
   border: {
-    hairline: '#232C34',
-    subtle: '#2A343C',
+    hairline: 'rgba(255,255,255,0.08)',
+    subtle: 'rgba(255,255,255,0.12)',
     strong: '#5A6873',
     focus: '#2FBCCF',
     destructive: '#F2564F',

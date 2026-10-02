@@ -1,41 +1,84 @@
 // Small shared primitives: Screen, Card, Eyebrow, ListRow.
 import React from 'react';
-import { Pressable, ScrollView, Text, View, ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { GlassBackground } from './Glass';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme';
 
-export function Screen({ children, scroll = true, style }: { children: React.ReactNode; scroll?: boolean; style?: ViewStyle }) {
-  const { c } = useTheme();
-  const insets = useSafeAreaInsets();
-  if (!scroll) return <View style={[{ flex: 1, backgroundColor: c.surface.canvas }, style]}>{children}</View>;
+/** Large in-page title, same style as "Saved Devices" on the Devices home. */
+export function PageTitle({ children, right }: { children: string; right?: React.ReactNode }) {
+  const { type } = useTheme();
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: c.surface.canvas }}
-      // Clears the floating pill bar on tab-root screens and the home indicator
-      // on pushed screens, so the last row / primary button is always reachable.
-      contentContainerStyle={[{ padding: 16, paddingBottom: 120 + insets.bottom }, style]}
-    >
-      {children}
-    </ScrollView>
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14, marginTop: 4 }}>
+      <Text style={[type.display, { color: '#FFFFFF', fontSize: 30, flex: 1 }]}>{children}</Text>
+      {right}
+    </View>
+  );
+}
+
+/**
+ * Page shell. Dark: the same black + purple-glow backdrop as the Devices home.
+ * With `title`, the page has no navigation bar — the title sits inside the page
+ * (tab-root screens). Without it, content starts below the transparent header.
+ */
+export function Screen({
+  children, scroll = true, style, title, titleRight,
+}: { children: React.ReactNode; scroll?: boolean; style?: ViewStyle; title?: string; titleRight?: React.ReactNode }) {
+  const { c, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+  const backdrop = isDark ? <GlassBackground base="#000000" strength={0.9} /> : null;
+  const head = title ? <PageTitle right={titleRight}>{title}</PageTitle> : null;
+  if (!scroll) {
+    return (
+      <View style={[{ flex: 1, backgroundColor: c.surface.canvas, paddingTop: title ? insets.top + 10 : 0 }, style]}>
+        {backdrop}
+        {head}
+        {children}
+      </View>
+    );
+  }
+  return (
+    <View style={{ flex: 1, backgroundColor: c.surface.canvas }}>
+      {backdrop}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentInsetAdjustmentBehavior={title ? 'never' : 'automatic'}
+        // Keyboard: native inset so fields it covers can be scrolled into view,
+        // and drag-down dismisses it with the content settling back smoothly.
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
+        // Clears the floating pill bar on tab-root screens and the home indicator
+        // on pushed screens, so the last row / primary button is always reachable.
+        contentContainerStyle={[{ padding: 16, paddingTop: title ? insets.top + 10 : 16, paddingBottom: 120 + insets.bottom }, style]}
+      >
+        {head}
+        {children}
+      </ScrollView>
+    </View>
   );
 }
 
 export function Card({ children, style, destructive }: { children: React.ReactNode; style?: ViewStyle; destructive?: boolean }) {
-  const { c, radius } = useTheme();
+  const { c, radius, isDark } = useTheme();
   return (
     <View
       style={[
         {
-          backgroundColor: c.surface.raised,
+          // Dark: frosted glass (translucent + real blur + a light top edge).
+          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : c.surface.raised,
           borderRadius: radius.l,
           borderWidth: 1,
-          borderColor: destructive ? c.border.destructive : c.border.subtle,
+          borderColor: destructive ? c.border.destructive : isDark ? 'rgba(255,255,255,0.12)' : c.border.subtle,
           overflow: 'hidden',
         },
         style,
       ]}
     >
+      {isDark && <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />}
+      {isDark && <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.18)' }} />}
       {children}
     </View>
   );

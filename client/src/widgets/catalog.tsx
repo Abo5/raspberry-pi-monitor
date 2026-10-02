@@ -55,7 +55,7 @@ function metricValue(key: SeriesKey, t: number): number {
   return previewValue(key, t);
 }
 
-function spark(key: SeriesKey, points = 24) {
+function sampleSpark(key: SeriesKey, points = 24) {
   const t = now();
   const from = t - 3_600_000;
   const step = 3_600_000 / points;
@@ -95,6 +95,7 @@ function MonoRing({ pct, label, value }: { pct: number; label: string; value: st
 }
 
 function MonoSpark({ samples, width, height }: { samples: { t: number; v: number }[]; width: number; height: number }) {
+  if (samples.length < 2) return <View style={{ width, height }} />;
   const vs = samples.map((s) => s.v);
   let min = Math.min(...vs);
   let max = Math.max(...vs);
@@ -139,7 +140,10 @@ function SmallFrame({ children, plain }: { children: React.ReactNode; plain?: bo
         width: 152,
         height: 152,
         borderRadius: 28,
-        backgroundColor: plain ? undefined : '#15151A',
+        backgroundColor: plain ? undefined : 'rgba(255,255,255,0.06)',
+        // frosted glass tile
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
         overflow: 'hidden',
         padding: 14,
       }}
@@ -156,7 +160,10 @@ function MediumFrame({ children, noPad }: { children: React.ReactNode; noPad?: b
         width: 318,
         height: 152,
         borderRadius: 28,
-        backgroundColor: '#15151A',
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        // frosted glass tile
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
         overflow: 'hidden',
         padding: noPad ? 0 : 14,
       }}
@@ -168,16 +175,28 @@ function MediumFrame({ children, noPad }: { children: React.ReactNode; noPad?: b
 
 // ---------- the renderer ----------
 
-export function WidgetPreview({ id, agentName }: { id: string; agentName: string }) {
+export function WidgetPreview({
+  id, agentName, live, history,
+}: {
+  id: string;
+  agentName: string;
+  /** Real values from the Pi (latest snapshot). Without it: sample data (gallery). */
+  live?: Partial<Record<SeriesKey, number>> | null;
+  /** Real recent samples for the sparklines. Without it: sample shapes (gallery). */
+  history?: (key: SeriesKey, points: number) => { t: number; v: number }[];
+}) {
   const t = now();
-  const temp = metricValue('cpu.temp_c', t);
-  const cpu = metricValue('cpu.util_pct', t);
-  const memPct = metricValue('mem.used_pct', t);
-  const disk = metricValue('disk.used_pct', t);
-  const load = metricValue('load.1m', t);
-  const rx = fmtBps(metricValue('net.rx_bps', t));
-  const tx = fmtBps(metricValue('net.tx_bps', t));
-  const up = fmtDuration(metricValue('sys.uptime_s', t));
+  // With live data, show only real readings — never fill gaps with samples.
+  const mv = (k: SeriesKey) => (live ? (live[k] ?? 0) : metricValue(k, t));
+  const spark = (k: SeriesKey, points = 24) => (history ? history(k, points) : sampleSpark(k, points));
+  const temp = mv('cpu.temp_c');
+  const cpu = mv('cpu.util_pct');
+  const memPct = mv('mem.used_pct');
+  const disk = mv('disk.used_pct');
+  const load = mv('load.1m');
+  const rx = fmtBps(mv('net.rx_bps'));
+  const tx = fmtBps(mv('net.tx_bps'));
+  const up = fmtDuration(mv('sys.uptime_s'));
   const thermal = temp >= 74 ? c.thermal.steps[3] : temp >= 60 ? c.thermal.steps[1] : c.viz.categorical[0];
 
   switch (id) {
@@ -247,7 +266,7 @@ export function WidgetPreview({ id, agentName }: { id: string; agentName: string
               {(memPct * 0.08).toFixed(1)} / 8.0 GB
             </Text>
           </View>
-          <View style={{ height: 8, borderRadius: 4, backgroundColor: '#23232A' }}>
+          <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.10)' }}>
             <View style={{ height: 8, borderRadius: 4, width: `${memPct}%`, backgroundColor: c.viz.categorical[0] }} />
           </View>
         </SmallFrame>

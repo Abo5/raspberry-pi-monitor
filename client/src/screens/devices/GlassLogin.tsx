@@ -4,7 +4,7 @@
 // the "glass" is layered translucency over the bloom-wave — no extra dependency.
 import React, { useState } from 'react';
 import {
-  KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View, useWindowDimensions,
+  Pressable, ScrollView, Text, TextInput, View, useWindowDimensions,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -77,8 +77,14 @@ export function GlassLogin() {
       {/* Darkening scrim so the glass reads clearly over the bloom */}
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(6,5,10,0.45)' }} />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{ flex: 1, paddingHorizontal: 22, paddingTop: insets.top + 12 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1 }}
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={{ flex: 1, paddingHorizontal: 22, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 20 }}>
           <Pressable onPress={() => nav.goBack()} hitSlop={12} style={{ marginBottom: 20 }} accessibilityLabel="Back">
             <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
           </Pressable>
@@ -174,7 +180,7 @@ export function GlassLogin() {
             </Text>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </ScrollView>
     </View>
   );
 }

@@ -22,6 +22,7 @@ use serde_json::json;
 use tokio::sync::broadcast;
 
 use crate::config::Config;
+use crate::exec::{self, ExecBody};
 use crate::rules::{backtest, RuleState};
 use crate::shell;
 use crate::store::{now_ms, Rule, Store};
@@ -50,6 +51,7 @@ pub fn router(state: AppState) -> Router {
         .route("/screen", get(ws_screen))
         .route("/screen.mjpeg", get(mjpeg_screen))
         .route("/input", get(ws_input))
+        .route("/exec", post(exec_route))
         .layer(middleware::from_fn_with_state(state.clone(), auth))
         .with_state(state)
 }
@@ -133,6 +135,10 @@ async fn run_action(State(s): State<AppState>, Path(id): Path<String>) -> impl I
         }
         None => (StatusCode::NOT_FOUND, "no such action in the allow-list").into_response(),
     }
+}
+
+async fn exec_route(State(_s): State<AppState>, Json(b): Json<ExecBody>) -> impl IntoResponse {
+    Json(exec::run(&b.command, b.timeout_ms).await)
 }
 
 async fn list_rules(State(s): State<AppState>) -> impl IntoResponse {

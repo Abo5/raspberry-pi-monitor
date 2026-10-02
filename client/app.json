@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Raspberry App",
+    "name": "Raspberry Pi",
     "slug": "raspberry-pi-monitor",
     "version": "0.1.0",
     "orientation": "default",
@@ -13,7 +13,9 @@
         {
           "faceIDPermission": "Face ID confirms it's you before opening a shell, the desktop, or running a destructive action."
         }
-      ]
+      ],
+      "expo-secure-store",
+      "@bacons/apple-targets"
     ],
     "ios": {
       "supportsTablet": true,
@@ -23,6 +25,11 @@
           "NSAllowsLocalNetworking": true
         },
         "NSLocalNetworkUsageDescription": "Connect to the Agent running on your Raspberry Pi on your local network."
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.abo5.raspberryapp"
+        ]
       }
     },
     "android": {

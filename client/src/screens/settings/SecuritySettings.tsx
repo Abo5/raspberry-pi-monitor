@@ -1,8 +1,9 @@
-// Settings → Security (§14). Changing a security setting requires biometric
-// re-auth (§17.2) — including turning the requirement off.
+// Settings → Security (§14). Face ID for shell & desktop starts OFF; the user can
+// turn it on (Face ID is checked once, so it's known to work) or off (Face ID
+// confirms it's them). Without Face ID set up on the iPhone it can't be turned on.
 import React from 'react';
-import { Switch } from 'react-native';
-import * as LocalAuthentication from 'expo-local-authentication';
+import { Alert, Switch } from 'react-native';
+import { biometricAvailable, confirmWithBiometrics } from '../../lib/biometric';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../theme';
 import { useStore } from '../../store/useStore';
@@ -13,17 +14,14 @@ export function SecuritySettings() {
   const nav = useNavigation<any>();
   const settings = useStore((s) => s.settings);
   const setSettings = useStore((s) => s.setSettings);
-  const actions = useStore((s) => s.actions);
-
-  // The toggle is locked on while any destructive Action exists (§14).
-  const lockedOn = actions.some((a) => a.destructive);
-
   const toggleBio = async (v: boolean) => {
-    if (await LocalAuthentication.hasHardwareAsync()) {
-      const res = await LocalAuthentication.authenticateAsync({ promptMessage: 'Change a security setting' });
-      if (!res.success) return;
+    if (v && !(await biometricAvailable())) {
+      Alert.alert('Face ID isn’t set up', 'Set up Face ID in the iPhone’s Settings › Face ID & Passcode, then turn this on.');
+      return;
     }
-    setSettings({ requireBioShellDesktop: v });
+    const ok = await confirmWithBiometrics(v ? 'Turn on Face ID for shell & desktop' : 'Turn off Face ID for shell & desktop');
+    if (!ok) return;
+    setSettings({ requireBioShellDesktop: v, bioUserSet: true });
   };
 
   return (
@@ -32,11 +30,12 @@ export function SecuritySettings() {
       <Card>
         <ListRow
           title="Require Face ID for shell & desktop"
-          subtitle={lockedOn ? 'Locked on: a destructive action exists in the allow-list' : undefined}
+          subtitle="Ask for Face ID before opening a remote shell or desktop"
+          // The whole row toggles, like iOS Settings — not only the small switch.
+          onPress={() => toggleBio(!settings.requireBioShellDesktop)}
           right={
             <Switch
-              value={settings.requireBioShellDesktop || lockedOn}
-              disabled={lockedOn}
+              value={settings.requireBioShellDesktop}
               onValueChange={toggleBio}
               trackColor={{ true: c.accent.base }}
               style={{ transform: [{ scale: 0.8 }] }}
@@ -46,10 +45,6 @@ export function SecuritySettings() {
         />
       </Card>
 
-      <Eyebrow>KEYS & DEVICES</Eyebrow>
-      <Card>
-        <ListRow title="Security log" chevron onPress={() => nav.navigate('SecurityLog')} last />
-      </Card>
     </Screen>
   );
 }

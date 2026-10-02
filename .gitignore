@@ -69,3 +69,6 @@ secrets/
 Thumbs.db
 *.tgz
 *.gz
+
+# ---- Rust: local cargo cache ----
+.cargo-home/
